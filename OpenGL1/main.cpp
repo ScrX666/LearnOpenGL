@@ -179,7 +179,7 @@ int main()
 		processInput(window);
 
 		// clear
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -190,6 +190,7 @@ int main()
 		ourShader.setVec3("lightColor", glm::vec3(1.0f,1.0f,1.0f));
 		ourShader.setVec3("objectColor", glm::vec3(1.0f, 0.5f, 0.31f));
 		ourShader.setVec3("lightPos", lightPos);
+		ourShader.setVec3("viewPos", camera.Position);
 		//mvp
 		//projection
 		glm::mat4 projection(1.0f);
@@ -203,7 +204,7 @@ int main()
 		ourShader.setMat4("view", view);
 		//model
 		glm::mat4 model = (1.0f);
-		model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
+		// model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
 		ourShader.setMat4("model", model);
 		
 		//render the cube
@@ -214,12 +215,13 @@ int main()
 		lightShader.use();
 		lightShader.setMat4("projection", projection);
 		lightShader.setMat4("view", view);
-		
+		//rotate the light 
+		lightPos.x = 1.0f + sin(glfwGetTime()) * 2.0f;
+		lightPos.y = sin(glfwGetTime() / 2.0f) * 1.0f;
 		//model
-		
-		
 		model = (1.0f);
 		model = translate(model, lightPos);
+		// model = rotate(model, (float)sin(glfwGetTime()) * glm::radians(50.0f), glm::vec3(0.0,1.0,0.0));
 		model = glm::scale(model, glm::vec3(0.2f));
 		lightShader.setMat4("model", model);
 		//render the light
