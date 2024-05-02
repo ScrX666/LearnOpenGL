@@ -83,8 +83,8 @@ int main()
 	
 	// build and compile our shader program
 	// ------------------------------------
-	Shader ourShader("4.2.texture.vs", "4.2.texture.fs");
-	Shader lightShader("light.vs", "light.fs");
+	Shader cubeObject("shader/object.vs", "shader/object.fs");
+	Shader lightShader("shader/light.vs", "shader/light.fs");
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
@@ -146,7 +146,7 @@ int main()
 	// object normal attribute
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
-	ourShader.use(); // don't forget to activate/use the shader before setting uniforms!
+	cubeObject.use(); // don't forget to activate/use the shader before setting uniforms!
 	
 	//light VAO
 	unsigned int lightVAO;
@@ -186,34 +186,34 @@ int main()
 	
 		//--------------------------------cube----------------------------------------
 		// render cube
-		ourShader.use();
-		ourShader.setVec3("light.lightPos", lightPos);
-		ourShader.setVec3("viewPos", camera.Position);
+		cubeObject.use();
+		cubeObject.setVec3("light.lightPos", lightPos);
+		cubeObject.setVec3("viewPos", camera.Position);
 		glm::vec3 lightColor(1.0f);
 		glm::vec3 diffuseColor = lightColor * glm::vec3(1.0f); // decrease the influence
 		glm::vec3 ambientColor = diffuseColor * glm::vec3(1.0f); // more decrease the influence
-		ourShader.setVec3("light.ambient",  ambientColor);
-		ourShader.setVec3("light.diffuse",  diffuseColor); // 将光照调暗了一些以搭配场景
-		ourShader.setVec3("light.specular", glm::vec3(1.0f, 1.0f, 1.0f)); 
-		ourShader.setVec3("material.ambient",  glm::vec3(0.0f, 0.1f, 0.06f));
-		ourShader.setVec3("material.diffuse",  glm::vec3(0.0f, 0.50980392f, 0.50980392f));
-		ourShader.setVec3("material.specular", glm::vec3(0.50196078f));
-		ourShader.setFloat("material.shininess", 32.0f);
+		cubeObject.setVec3("light.ambient",  ambientColor);
+		cubeObject.setVec3("light.diffuse",  diffuseColor); // 将光照调暗了一些以搭配场景
+		cubeObject.setVec3("light.specular", glm::vec3(1.0f, 1.0f, 1.0f)); 
+		cubeObject.setVec3("material.ambient",  glm::vec3(0.0f, 0.1f, 0.06f));
+		cubeObject.setVec3("material.diffuse",  glm::vec3(0.0f, 0.50980392f, 0.50980392f));
+		cubeObject.setVec3("material.specular", glm::vec3(0.50196078f));
+		cubeObject.setFloat("material.shininess", 32.0f);
 		//mvp
 		//projection
 		glm::mat4 projection(1.0f);
 		float aspect = static_cast<float>(SCR_WIDTH / SCR_HEIGHT);
 		projection = glm::perspective(glm::radians(camera.Fov), aspect , 0.1f, 100.0f);
-		ourShader.setMat4("projection", projection);
+		cubeObject.setMat4("projection", projection);
 		//view
 		glm::mat4 view(1.0f);
 		view = camera.GetViewMatrix();
 		// to vs shader
-		ourShader.setMat4("view", view);
+		cubeObject.setMat4("view", view);
 		//model
 		glm::mat4 model = (1.0f);
 		// model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
-		ourShader.setMat4("model", model);
+		cubeObject.setMat4("model", model);
 		
 		//render the cube
 		glBindVertexArray(VAO);
