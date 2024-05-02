@@ -34,7 +34,7 @@ double lastX = SCR_WIDTH / 2;
 double lastY = SCR_HEIGHT /2;
 
 //light
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec3 lightPos(1.2f, 0.0f, 2.0f);
 
 int main()
 {
@@ -187,10 +187,18 @@ int main()
 		//--------------------------------cube----------------------------------------
 		// render cube
 		ourShader.use();
-		ourShader.setVec3("lightColor", glm::vec3(1.0f,1.0f,1.0f));
-		ourShader.setVec3("objectColor", glm::vec3(1.0f, 0.5f, 0.31f));
-		ourShader.setVec3("lightPos", lightPos);
+		ourShader.setVec3("light.lightPos", lightPos);
 		ourShader.setVec3("viewPos", camera.Position);
+		glm::vec3 lightColor(1.0f);
+		glm::vec3 diffuseColor = lightColor * glm::vec3(1.0f); // decrease the influence
+		glm::vec3 ambientColor = diffuseColor * glm::vec3(1.0f); // more decrease the influence
+		ourShader.setVec3("light.ambient",  ambientColor);
+		ourShader.setVec3("light.diffuse",  diffuseColor); // 将光照调暗了一些以搭配场景
+		ourShader.setVec3("light.specular", glm::vec3(1.0f, 1.0f, 1.0f)); 
+		ourShader.setVec3("material.ambient",  glm::vec3(0.0f, 0.1f, 0.06f));
+		ourShader.setVec3("material.diffuse",  glm::vec3(0.0f, 0.50980392f, 0.50980392f));
+		ourShader.setVec3("material.specular", glm::vec3(0.50196078f));
+		ourShader.setFloat("material.shininess", 32.0f);
 		//mvp
 		//projection
 		glm::mat4 projection(1.0f);
@@ -215,13 +223,13 @@ int main()
 		lightShader.use();
 		lightShader.setMat4("projection", projection);
 		lightShader.setMat4("view", view);
+		lightShader.setVec3("lightColor", lightColor);
 		//rotate the light 
-		lightPos.x = 1.0f + sin(glfwGetTime()) * 2.0f;
-		lightPos.y = sin(glfwGetTime() / 2.0f) * 1.0f;
+		// lightPos.x = 1.0f + sin(glfwGetTime()) * 2.0f;
+		// lightPos.y = sin(glfwGetTime() / 2.0f) * 1.0f;
 		//model
 		model = (1.0f);
 		model = translate(model, lightPos);
-		// model = rotate(model, (float)sin(glfwGetTime()) * glm::radians(50.0f), glm::vec3(0.0,1.0,0.0));
 		model = glm::scale(model, glm::vec3(0.2f));
 		lightShader.setMat4("model", model);
 		//render the light
