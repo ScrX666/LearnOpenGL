@@ -7,9 +7,14 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
 #include "Camera.h"
 #include "stb_image.h"
 #include "myShader.h"
+
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
@@ -19,7 +24,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 
 // settings
-const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_WIDTH = 1000;
 const unsigned int SCR_HEIGHT = 600;
 
 //Camera
@@ -27,7 +32,6 @@ glm::vec3 cameraPos  = glm::vec3(0.0f, 0.0f, 3.0f);
 float deltaTime = 0.0f; // 当前帧与上一帧的时间差
 float lastFrame = 0.0f; // 上一帧的时间
 Camera camera(cameraPos);
-
 //rotate
 bool firstMouse = true;
 double lastX = SCR_WIDTH / 2;
@@ -35,6 +39,10 @@ double lastY = SCR_HEIGHT /2;
 
 //light
 glm::vec3 lightPos(1.2f, 0.0f, 2.0f);
+
+//object
+float shininess = 32.0f;
+
 
 int main()
 {
@@ -78,8 +86,13 @@ int main()
 	// -----------------------------
 	glEnable(GL_DEPTH_TEST);
 
-
-
+	// configure ImGui
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext(NULL);     // Setup Dear ImGui context
+	ImGui::StyleColorsDark();       // Setup Dear ImGui style
+	ImGui_ImplGlfw_InitForOpenGL(window, true);     // Setup Platform/Renderer backends
+	ImGui_ImplOpenGL3_Init("#version 330");
+	
 	
 	// build and compile our shader program
 	// ------------------------------------
@@ -168,6 +181,7 @@ int main()
 	// -----------
 	while (!glfwWindowShouldClose(window))
 	{
+		
 		// per-frame time logic
 		// --------------------
 		float currentFrame = static_cast<float>(glfwGetTime());
@@ -182,8 +196,7 @@ int main()
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	
+		
 		//--------------------------------cube----------------------------------------
 		// render cube
 		cubeObject.use();
@@ -198,7 +211,7 @@ int main()
 		cubeObject.setVec3("material.ambient",  glm::vec3(0.0f, 0.1f, 0.06f));
 		cubeObject.setVec3("material.diffuse",  glm::vec3(0.0f, 0.50980392f, 0.50980392f));
 		cubeObject.setVec3("material.specular", glm::vec3(0.50196078f));
-		cubeObject.setFloat("material.shininess", 32.0f);
+		cubeObject.setFloat("material.shininess", shininess);
 		//mvp
 		//projection
 		glm::mat4 projection(1.0f);
@@ -235,7 +248,26 @@ int main()
 		//render the light
 		glBindVertexArray(lightVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
+		
+		// ----------------------------------ImGui init--------------------------------------
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
 
+		ImGui::Begin("UI Box", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::Checkbox("Enable Mouse Control", &camera.canMouseControl);
+		if(!camera.canMouseControl)
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		else
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		ImGui::SliderFloat("shininess", &shininess, 1, 128);
+		ImGui::End();
+		ImGui::ShowDemoWindow();
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+
+		
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
@@ -273,6 +305,10 @@ void processInput(GLFWwindow* window)
 		camera.ProcessKeyboard(DOWN,deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
 		camera.ProcessKeyboard(UP,deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
+		if(camera.canMouseControl)
+			camera.canMouseControl = false;
+		
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -306,3 +342,5 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
+
+

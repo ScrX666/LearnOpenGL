@@ -20,6 +20,7 @@ const float SPEED       =  2.5f;
 const float SENSITIVITY =  0.1f;
 const float ZOOM        =  45.0f;
 
+
 class Camera
 {
 public:
@@ -39,7 +40,8 @@ public:
     
     float deltaTime = 0.0f; // 当前帧与上一帧的时间差
     float lastFrame = 0.0f; // 上一帧的时间
-
+    bool canMouseControl = true;//UI是否可以输入
+    
     Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH)
     : Front(glm::vec3(0.0f, 0.0f, -1.0f)), Fov(ZOOM), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY)
     {
@@ -70,18 +72,21 @@ public:
     void ProcessKeyboard(Camera_Movement direction, float deltaTime)
     {
         float velocity = MovementSpeed * deltaTime;
-        if (direction == FORWARD)
-            Position += Front * velocity;
-        if (direction == BACKWARD)
-            Position -= Front * velocity;
-        if (direction == LEFT)
-            Position -= Right * velocity;
-        if (direction == RIGHT)
-            Position += Right * velocity;
-        if(direction == UP)
-            Position += Up * velocity;
-        if(direction == DOWN)
-            Position -= Up * velocity;
+        if(canMouseControl)
+        {
+            if (direction == FORWARD)
+                Position += Front * velocity;
+            if (direction == BACKWARD)
+                Position -= Front * velocity;
+            if (direction == LEFT)
+                Position -= Right * velocity;
+            if (direction == RIGHT)
+                Position += Right * velocity;
+            if(direction == UP)
+                Position += Up * velocity;
+            if(direction == DOWN)
+                Position -= Up * velocity;
+        }
     }
 
     // processes input received from a mouse input system. Expects the offset value in both the x and y direction.
@@ -89,9 +94,11 @@ public:
     {
         xoffset *= MouseSensitivity;
         yoffset *= MouseSensitivity;
-
-        Yaw   += xoffset;
-        Pitch += yoffset;
+        if (canMouseControl)
+        {
+            Yaw   += xoffset;
+            Pitch += yoffset;
+        }
 
         // make sure that when pitch is out of bounds, screen doesn't get flipped
         if (constrainPitch)
