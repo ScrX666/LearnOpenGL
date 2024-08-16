@@ -7,19 +7,20 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
+//#include "imgui.h"
+//#include "imgui_impl_glfw.h"
+//#include "imgui_impl_opengl3.h"
 
 #include "Camera.h"
-#include "stb_image.h"
 #include "myShader.h"
+#include "stb_image.h"
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+unsigned int loadTexture(char const* path);
 
 
 
@@ -38,11 +39,7 @@ double lastX = SCR_WIDTH / 2;
 double lastY = SCR_HEIGHT /2;
 
 //light
-glm::vec3 lightPos(1.2f, 0.0f, 2.0f);
-
-//object
-float shininess = 32.0f;
-
+glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 int main()
 {
@@ -86,12 +83,12 @@ int main()
 	// -----------------------------
 	glEnable(GL_DEPTH_TEST);
 
-	// configure ImGui
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext(NULL);     // Setup Dear ImGui context
-	ImGui::StyleColorsDark();       // Setup Dear ImGui style
-	ImGui_ImplGlfw_InitForOpenGL(window, true);     // Setup Platform/Renderer backends
-	ImGui_ImplOpenGL3_Init("#version 330");
+	// ---------------------configure ImGui---------------------------------
+	//IMGUI_CHECKVERSION();
+	//ImGui::CreateContext(NULL);     // Setup Dear ImGui context
+	//ImGui::StyleColorsDark();       // Setup Dear ImGui style
+	//ImGui_ImplGlfw_InitForOpenGL(window, true);     // Setup Platform/Renderer backends
+	//ImGui_ImplOpenGL3_Init("#version 330");
 	
 	
 	// build and compile our shader program
@@ -100,51 +97,52 @@ int main()
 	Shader lightShader("shader/light.vs", "shader/light.fs");
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
-	// ------------------------------------------------------------------
+	// ----------------------- load mesh data ----------------------------
 	float vertices[] = {
-		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-		 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-		 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-		 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-		-0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+		// positions          // normals           // texture coords
+		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
+		 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
 
-		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-		 0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-		 0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-		 0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-		-0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  1.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
 
-		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-		-0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-		-0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+		-0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
+		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+		-0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
+		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
 
-		 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-		 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-		 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-		 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-		 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-		 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
+		 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+		 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+		 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
 
-		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-		 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-		 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-		 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-		-0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
+		 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  1.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
 
-		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-		 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-		 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-		 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-		-0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
+		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  1.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
 	};
-	
+	//---------------------------------------- setting VAO/VBO ---------------------------------------------------
 	//object VAO
 	unsigned int VBO, VAO;
 	glGenVertexArrays(1, &VAO);
@@ -154,11 +152,14 @@ int main()
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 	// object position attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	// object normal attribute
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
+	// object texcoord attribute
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
 	cubeObject.use(); // don't forget to activate/use the shader before setting uniforms!
 	
 	//light VAO
@@ -168,15 +169,21 @@ int main()
 	
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	// light position attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	
 
-	// tell opengl for each sampler to which texture unit it belongs to (only has to be done once)
-	// -------------------------------------------------------------------------------------------
+	// -------------------------------------- load texture -----------------------------------------------------
+	unsigned int diffuseTex = loadTexture("textures/container2.png");
+	unsigned int specularTex = loadTexture("textures/container2_specular.png");
+	unsigned int emissionTex = loadTexture("textures/matrix.jpg");
 
+	cubeObject.use();
+	// set texture glActiveTexture ID
+	cubeObject.setInt("material.diffuseTex", 0);
+	cubeObject.setInt("material.specularTex", 1);
+	cubeObject.setInt("material.emissionTex", 2);
 
-	
 	// render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
@@ -197,21 +204,17 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
-		//--------------------------------cube----------------------------------------
-		// render cube
+		//-------------------------------------------- passing parameters (cube)--------------------------------------------------
 		cubeObject.use();
 		cubeObject.setVec3("light.lightPos", lightPos);
 		cubeObject.setVec3("viewPos", camera.Position);
-		glm::vec3 lightColor(1.0f);
-		glm::vec3 diffuseColor = lightColor * glm::vec3(1.0f); // decrease the influence
-		glm::vec3 ambientColor = diffuseColor * glm::vec3(1.0f); // more decrease the influence
-		cubeObject.setVec3("light.ambient",  ambientColor);
-		cubeObject.setVec3("light.diffuse",  diffuseColor); // 将光照调暗了一些以搭配场景
+
+		cubeObject.setVec3("light.ambient", glm::vec3(0.2f, 0.2f, 0.2f));
+		cubeObject.setVec3("light.diffuse", glm::vec3(0.5f, 0.5f, 0.5f));
 		cubeObject.setVec3("light.specular", glm::vec3(1.0f, 1.0f, 1.0f)); 
-		cubeObject.setVec3("material.ambient",  glm::vec3(0.0f, 0.1f, 0.06f));
-		cubeObject.setVec3("material.diffuse",  glm::vec3(0.0f, 0.50980392f, 0.50980392f));
-		cubeObject.setVec3("material.specular", glm::vec3(0.50196078f));
-		cubeObject.setFloat("material.shininess", shininess);
+
+		cubeObject.setFloat("material.shininess", 64);
+
 		//mvp
 		//projection
 		glm::mat4 projection(1.0f);
@@ -227,16 +230,24 @@ int main()
 		glm::mat4 model = (1.0f);
 		// model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
 		cubeObject.setMat4("model", model);
-		
-		//render the cube
+
+		//bind texture
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, diffuseTex);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, specularTex);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, emissionTex);
+
+		//-------------------------------------------- RENDER (cube)--------------------------------------------------
 		glBindVertexArray(VAO);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 
-		//--------------------------------light----------------------------------------
+		//-------------------------------------------- passing parameters (light)--------------------------------------------------
 		lightShader.use();
 		lightShader.setMat4("projection", projection);
 		lightShader.setMat4("view", view);
-		lightShader.setVec3("lightColor", lightColor);
+		lightShader.setVec3("lightColor", glm::vec3(1));
 		//rotate the light 
 		// lightPos.x = 1.0f + sin(glfwGetTime()) * 2.0f;
 		// lightPos.y = sin(glfwGetTime() / 2.0f) * 1.0f;
@@ -245,26 +256,26 @@ int main()
 		model = translate(model, lightPos);
 		model = glm::scale(model, glm::vec3(0.2f));
 		lightShader.setMat4("model", model);
-		//render the light
+		//-------------------------------------------- RENDER (light)--------------------------------------------------
 		glBindVertexArray(lightVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 		
 		// ----------------------------------ImGui init--------------------------------------
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
+		//ImGui_ImplOpenGL3_NewFrame();
+		//ImGui_ImplGlfw_NewFrame();
+		//ImGui::NewFrame();
 
-		ImGui::Begin("UI Box", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-		ImGui::Checkbox("Enable Mouse Control", &camera.canMouseControl);
-		if(!camera.canMouseControl)
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		else
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-		ImGui::SliderFloat("shininess", &shininess, 1, 128);
-		ImGui::End();
-		ImGui::ShowDemoWindow();
-		ImGui::Render();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		//ImGui::Begin("UI Box", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+		//ImGui::Checkbox("Enable Mouse Control", &camera.canMouseControl);
+		//if(!camera.canMouseControl)
+		//	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		//else
+		//	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		//ImGui::SliderFloat("shininess", &shininess, 1, 128);
+		//ImGui::End();
+		//ImGui::ShowDemoWindow();
+		//ImGui::Render();
+		//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 
 		
@@ -341,6 +352,43 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	camera.ProcessMouseScroll(static_cast<float>(yoffset));
+}
+
+unsigned int loadTexture(char const* path)
+{
+	unsigned int textureID;
+	glGenTextures(1, &textureID);
+
+	int width, height, nrComponents;
+	unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
+	if (data)
+	{
+		GLenum format;
+		if (nrComponents == 1)
+			format = GL_RED;
+		else if (nrComponents == 3)
+			format = GL_RGB;
+		else if (nrComponents == 4)
+			format = GL_RGBA;
+
+		glBindTexture(GL_TEXTURE_2D, textureID);
+		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		stbi_image_free(data);
+	}
+	else
+	{
+		std::cout << "Texture failed to load at path: " << path << std::endl;
+		stbi_image_free(data);
+	}
+
+	return textureID;
 }
 
 
