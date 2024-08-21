@@ -1,1 +1,2 @@
 D:\Dev\OpenGL1\OpenGL1\x64\Debug\OpenGL1.vcxproj.CopyComplete
+D:\Project\Rider\LearnOpenGL\OpenGL1\x64\Debug\OpenGL1.vcxproj.CopyComplete
