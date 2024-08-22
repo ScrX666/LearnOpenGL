@@ -145,8 +145,11 @@
     <None Include="shader\object.vs" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="myMesh.h" />
+    <ClInclude Include="myModel.h" />
     <ClInclude Include="myShader.h" />
     <ClInclude Include="src\Camera.h" />
+    <ClInclude Include="src\filesystem.h" />
     <ClInclude Include="src\myShader.h" />
     <ClInclude Include="src\stb_image.h" />
     <ClInclude Include="stb_image.h" />

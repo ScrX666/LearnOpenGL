@@ -7,6 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+
 //#include "imgui.h"
 //#include "imgui_impl_glfw.h"
 //#include "imgui_impl_opengl3.h"
@@ -14,6 +15,7 @@
 #include "Camera.h"
 #include "myShader.h"
 #include "stb_image.h"
+#include "myModel.h"
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -162,47 +164,23 @@ int main()
 		glm::vec3(-1.3f,  1.0f, -1.5f)
 	};
 
-	//---------------------------------------- setting VAO/VBO ---------------------------------------------------
-	//object VAO
-	unsigned int VBO, VAO;
-	glGenVertexArrays(1, &VAO);
+	unsigned int VBO;
 	glGenBuffers(1, &VBO);
-	
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	// object position attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	// object normal attribute
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(1);
-	// object texcoord attribute
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-	glEnableVertexAttribArray(2);
-	cubeObject.use(); // don't forget to activate/use the shader before setting uniforms!
-	
 	//light VAO
 	unsigned int lightVAO;
 	glGenVertexArrays(1, &lightVAO);
 	glBindVertexArray(lightVAO);
-	
+
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 	// light position attribute
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
-	
 
-	// -------------------------------------- load texture -----------------------------------------------------
-	unsigned int diffuseTex = loadTexture("textures/container2.png");
-	unsigned int specularTex = loadTexture("textures/container2_specular.png");
-	unsigned int emissionTex = loadTexture("textures/matrix.jpg");
+	// load models
+ // -----------
+	Model ourModel("Assets/nanosuit/nanosuit.obj");
 
-	cubeObject.use();
-	// set texture glActiveTexture ID
-	cubeObject.setInt("material.diffuse", 0);
-	cubeObject.setInt("material.specular", 1);
-	//cubeObject.setInt("material.emissionTex", 2);
 
 	// render loop
 	// -----------
@@ -232,8 +210,9 @@ int main()
 		cubeObject.setVec3("dirLight.ambient", glm::vec3(0.05f, 0.05f, 0.05f));
 		cubeObject.setVec3("dirLight.diffuse", glm::vec3(0.4f, 0.4f, 0.4f));
 		cubeObject.setVec3("dirLight.specular", glm::vec3(0.5f, 0.5f, 0.5f));
+		cubeObject.setFloat("material.shininess", 32);
 		// point light 1
-		cubeObject.setVec3("pointLights[0].position", pointLightPositions[0]);
+		cubeObject.setVec3("pointLights[0].position", lightPos);
 		cubeObject.setVec3("pointLights[0].ambient", glm::vec3(0.05f, 0.05f, 0.05f));
 		cubeObject.setVec3("pointLights[0].diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
 		cubeObject.setVec3("pointLights[0].specular", glm::vec3(1.0f, 1.0f, 1.0f));
@@ -264,21 +243,6 @@ int main()
 		cubeObject.setFloat("pointLights[3].constant", 1.0f);
 		cubeObject.setFloat("pointLights[3].linear", 0.09f);
 		cubeObject.setFloat("pointLights[3].quadratic", 0.032f);
-
-		//spot light
-		cubeObject.setVec3("spotLight.position", camera.Position);
-		cubeObject.setVec3("spotLight.direction", camera.Front);
-		cubeObject.setVec3("spotLight.ambient", glm::vec3(0.0f, 0.0f, 0.0f));
-		cubeObject.setVec3("spotLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
-		cubeObject.setVec3("spotLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
-		cubeObject.setFloat("spotLight.constant", 1.0f);
-		cubeObject.setFloat("spotLight.linear", 0.09f);
-		cubeObject.setFloat("spotLight.quadratic", 0.032f);
-		cubeObject.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-		cubeObject.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
-
-		cubeObject.setFloat("material.shininess", 32);
-
 		//mvp
 		//projection
 		glm::mat4 projection(1.0f);
@@ -291,33 +255,12 @@ int main()
 		// to vs shader
 		cubeObject.setMat4("view", view);
 		//model
-		glm::mat4 model = (1.0f);
-		//cubeObject.setMat4("model", model);
-
-		// model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
-		
-
-		//bind texture
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, diffuseTex);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, specularTex);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, emissionTex);
-
-		//-------------------------------------------- RENDER (cube)--------------------------------------------------
-		glBindVertexArray(VAO);
-		for (unsigned int i = 0; i < 10; i++)
-		{
-			// calculate the model matrix for each object and pass it to shader before drawing
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, cubePositions[i]);
-			float angle = 20.0f * i;
-			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-			cubeObject.setMat4("model", model);
-
-			glDrawArrays(GL_TRIANGLES, 0, 36);
-		}
+		// render the loaded model
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
+		model = glm::scale(model, glm::vec3(0.1f, 0.1f, 0.1f));	// it's a bit too big for our scene, so scale it down
+		cubeObject.setMat4("model", model);
+		ourModel.Draw(cubeObject);
 
 		//-------------------------------------------- passing parameters (light)--------------------------------------------------
 		lightShader.use();
@@ -326,9 +269,12 @@ int main()
 		lightShader.setVec3("lightColor", glm::vec3(1));
 
 
-		//rotate the light 
-		// lightPos.x = 1.0f + sin(glfwGetTime()) * 2.0f;
-		// lightPos.y = sin(glfwGetTime() / 2.0f) * 1.0f;
+		//rotate the light 圆周运动
+		float angle = 2 * 3.14 * glfwGetTime() / 5;
+		lightPos.z = 0 + cos(angle);
+		lightPos.x = 0 + sin(angle);
+		 /*lightPos.x = 1.0f + sin(glfwGetTime()) * 2.0f;
+		 lightPos.y = sin(glfwGetTime() / 2.0f) * 1.0f;*/
 		//model
 		model = (1.0f);
 		model = translate(model, lightPos);
@@ -365,10 +311,10 @@ int main()
 
 	// optional: de-allocate all resources once they've outlived their purpose:
 	// ------------------------------------------------------------------------
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	/*glDeleteVertexArrays(1, &lightVAO);*/
+
 	
+	glDeleteBuffers(1, &VBO);
+	glDeleteVertexArrays(1, &lightVAO);
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------
 	glfwTerminate();

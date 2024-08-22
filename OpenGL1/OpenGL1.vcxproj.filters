@@ -58,5 +58,14 @@
     <ClInclude Include="src\stb_image.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="myMesh.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="myModel.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\filesystem.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
