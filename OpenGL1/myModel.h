@@ -151,6 +151,9 @@ inline Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
         // 3. normal maps
         std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
         textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+    	// 4. reflect maps
+        std::vector<Texture> reflectMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_reflect");
+        textures.insert(textures.end(), reflectMaps.begin(), reflectMaps.end());
     }
 
     return Mesh(vertices, indices, textures);
