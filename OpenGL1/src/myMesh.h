@@ -76,7 +76,7 @@ public:
         // always good practice to set everything back to defaults once configured.
         glActiveTexture(GL_TEXTURE0);
     }
-private:
+public:
     /*  äÖÈ¾Êý¾Ý  */
     unsigned int VAO, VBO, EBO;
     /*  º¯Êý  */
