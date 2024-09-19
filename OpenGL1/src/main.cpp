@@ -331,7 +331,7 @@ int main()
 	planeShader.use();
 	planeShader.setInt("texture1", 0);
 	//加载小行星带
-	unsigned int amount = 100000;
+	unsigned int amount = 1000000;
 	glm::mat4* modelMatrices;
 	modelMatrices = new glm::mat4[amount];
 	srand(static_cast<unsigned int>(glfwGetTime())); // initialize random seed
@@ -491,9 +491,9 @@ int main()
 		compositeShader.use();
 		// draw screen quad
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, accumTexture);
+		glBindTexture(GL_TEXTURE_2D, accumTexture);// 使用渲染半透明物体时记录的RT0
 		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, revealTexture);
+		glBindTexture(GL_TEXTURE_2D, revealTexture);// 使用渲染半透明物体时记录的RT1
 		glBindVertexArray(quadVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
