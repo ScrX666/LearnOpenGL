@@ -69,10 +69,9 @@ int main()
 	// glfw: initialize and configure
 	// ------------------------------
 	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_SAMPLES, 4);
 #ifdef __APPLE__
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
@@ -101,12 +100,11 @@ int main()
 		std::cout << "Failed to initialize GLAD" << std::endl;
 		return -1;
 	}
-
+	std::cout << "OpenGL version: " << glGetString(GL_VERSION) << std::endl;
+	std::cout << "GLSL version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
+	std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
 	// configure global opengl state
 	// -----------------------------
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	//解锁60帧
 	glfwSwapInterval(0);  // 0 表示关闭 V-Sync，1 表示打开 V-Sync
 
@@ -125,6 +123,7 @@ int main()
 	Shader lightShader("shader/light.vs", "shader/light.fs");
 	Shader screenShader("shader/screen.vs", "shader/screen.fs");
 	Shader skyboxShader("shader/skybox.vs", "shader/skybox.fs");
+	Shader compositeShader("shader/composite.vs", "shader/composite.fs");
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ----------------------- load mesh data ----------------------------
@@ -173,16 +172,7 @@ int main()
 		-1.0f, -1.0f,  1.0f,
 		 1.0f, -1.0f,  1.0f
 	};
-	float planeVertices[] = {
-		// positions          // texture Coords 
-		 5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
-		-5.0f, -0.5f,  5.0f,  0.0f, 0.0f,
-		-5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
 
-		 5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
-		-5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
-		 5.0f, -0.5f, -5.0f,  2.0f, 2.0f
-	};
 	float transparentVertices[] = {
 		// positions         // texture Coords (swapped y coordinates because texture is flipped upside down)
 		0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
@@ -194,26 +184,30 @@ int main()
 		1.0f,  0.5f,  0.0f,  1.0f,  0.0f
 	};
 
-	std::vector<glm::vec3> vegetation
-	{
-		glm::vec3(-1.5f, 0.0f, -0.48f),
-		glm::vec3(1.5f, 0.0f, 0.51f),
-		glm::vec3(0.0f, 0.0f, 0.7f),
-		glm::vec3(-0.3f, 0.0f, -2.3f),
-		glm::vec3(0.5f, 0.0f, -0.6f)
+	float quadVertices[] = {
+		// positions		// uv
+		-1.0f, -1.0f, 0.0f,	0.0f, 0.0f,
+		 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+		 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+
+		 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f
 	};
 
-	float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
-	// positions   // texCoords
-	-1.0f,  1.0f,  0.0f, 1.0f,
-	-1.0f, -1.0f,  0.0f, 0.0f,
-	 1.0f, -1.0f,  1.0f, 0.0f,
-
-	-1.0f,  1.0f,  0.0f, 1.0f,
-	 1.0f, -1.0f,  1.0f, 0.0f,
-	 1.0f,  1.0f,  1.0f, 1.0f
-	};
-	//线框模式查看
+	// 作为帧缓冲输出的屏幕VAO以及合并处理
+	// screen VAO
+	unsigned int quadVAO, quadVBO;
+	glGenVertexArrays(1, &quadVAO);
+	glGenBuffers(1, &quadVBO);
+	glBindVertexArray(quadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glBindVertexArray(0);
 
 	// skybox VAO
 	unsigned int skyboxVAO, skyboxVBO;
@@ -238,7 +232,68 @@ int main()
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 	glBindVertexArray(0);
 
-	
+	// -------------------- O I T ---------------
+		// set up framebuffers and their texture attachments
+	// ------------------------------------------------------------------
+	//创建两个帧缓冲区
+	unsigned int opaqueFBO, transparentFBO;
+	glGenFramebuffers(1, &opaqueFBO);
+	glGenFramebuffers(1, &transparentFBO);
+	//为不透明帧缓冲区域附加两个纹理组件
+	// set up attachments for opaque framebuffer
+	unsigned int opaqueTexture;
+	glGenTextures(1, &opaqueTexture);
+	glBindTexture(GL_TEXTURE_2D, opaqueTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	unsigned int depthTexture;
+	glGenTextures(1, &depthTexture);
+	glBindTexture(GL_TEXTURE_2D, depthTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, opaqueTexture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		std::cout << "ERROR::FRAMEBUFFER:: Opaque framebuffer is not complete!" << std::endl;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	//为半透明贴图附加两个纹理组件，一个为叠加纹理：叠加颜色；另一个为显现纹理：根据a通道值显示透明度
+	// set up attachments for transparent framebuffer
+	unsigned int accumTexture;
+	glGenTextures(1, &accumTexture);
+	glBindTexture(GL_TEXTURE_2D, accumTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	unsigned int revealTexture;
+	glGenTextures(1, &revealTexture);
+	glBindTexture(GL_TEXTURE_2D, revealTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, SCR_WIDTH, SCR_HEIGHT, 0, GL_RED, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, transparentFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, accumTexture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, revealTexture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0); // opaque framebuffer's depth texture
+
+	const GLenum transparentDrawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+	glDrawBuffers(2, transparentDrawBuffers);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		std::cout << "ERROR::FRAMEBUFFER:: Transparent framebuffer is not complete!" << std::endl;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	Model planetModel("Assets/planet/planet.obj");
 	Model rockModel("Assets/rock/rock.obj");
@@ -265,6 +320,10 @@ int main()
 
 	unsigned int cubemapTexture = loadCubemap(stars);
 
+	// set up intermediate variables
+	// ------------------------------------------------------------------
+	glm::vec4 zeroFillerVec(0.0f);
+	glm::vec4 oneFillerVec(1.0f);
 	skyboxShader.use();
 	skyboxShader.setInt("skybox", 0);
 	// shader configuration
@@ -343,11 +402,17 @@ int main()
 		// -----
 		processInput(window);
 
-		//glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		//glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
-
 		// make sure we clear the framebuffer's content
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+		//在每一帧重置深度函数和深度遮罩
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LESS);// 正常深度测试，深度小的通过
+		glDepthMask(GL_TRUE);// 可以写入深度缓冲
+		glDisable(GL_BLEND);// 禁用混合模式
+		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
+		// 将不透明物体绑定到不透明帧缓冲
+		// bind opaque framebuffer to render solid objects
+		glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		//-------------------------------------------- passing parameters (cube)--------------------------------------------------
@@ -367,30 +432,8 @@ int main()
 		cubeObject.setFloat("pointLights[0].constant", 1.0f);
 		cubeObject.setFloat("pointLights[0].linear", 0.09f);
 		cubeObject.setFloat("pointLights[0].quadratic", 0.032f);
-		// point light 2
-		cubeObject.setVec3("pointLights[1].position", pointLightPositions[1]);
-		cubeObject.setVec3("pointLights[1].ambient", glm::vec3(0.05f, 0.05f, 0.05f));
-		cubeObject.setVec3("pointLights[1].diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
-		cubeObject.setVec3("pointLights[1].specular", glm::vec3(1.0f, 1.0f, 1.0f));
-		cubeObject.setFloat("pointLights[1].constant", 1.0f);
-		cubeObject.setFloat("pointLights[1].linear", 0.09f);
-		cubeObject.setFloat("pointLights[1].quadratic", 0.032f);
-		// point light 3
-		cubeObject.setVec3("pointLights[2].position", pointLightPositions[2]);
-		cubeObject.setVec3("pointLights[2].ambient", glm::vec3(0.05f, 0.05f, 0.05f));
-		cubeObject.setVec3("pointLights[2].diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
-		cubeObject.setVec3("pointLights[2].specular", glm::vec3(1.0f, 1.0f, 1.0f));
-		cubeObject.setFloat("pointLights[2].constant", 1.0f);
-		cubeObject.setFloat("pointLights[2].linear", 0.09f);
-		cubeObject.setFloat("pointLights[2].quadratic", 0.032f);
-		// point light 4
-		cubeObject.setVec3("pointLights[3].position", pointLightPositions[3]);
-		cubeObject.setVec3("pointLights[3].ambient", glm::vec3(0.05f, 0.05f, 0.05f));
-		cubeObject.setVec3("pointLights[3].diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
-		cubeObject.setVec3("pointLights[3].specular", glm::vec3(1.0f, 1.0f, 1.0f));
-		cubeObject.setFloat("pointLights[3].constant", 1.0f);
-		cubeObject.setFloat("pointLights[3].linear", 0.09f);
-		cubeObject.setFloat("pointLights[3].quadratic", 0.032f);
+
+		// ----------------- OPAQUE -------------------
 		//mvp
 		//projection
 		glm::mat4 projection(1.0f);
@@ -410,8 +453,20 @@ int main()
 		cubeObject.setMat4("model", model);
 
 		planetModel.Draw(cubeObject);
-
+		// ----------------- TRANSLUCENT -------------------
 		// 绘制小行星
+		glDepthMask(GL_FALSE); //禁用深度缓冲。半透明不会影响不透明的深度值
+		glEnable(GL_BLEND);	//开启混合
+		glBlendFunci(0, GL_ONE, GL_ONE); //第一个附件为 src+dist混合
+		glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_COLOR);// 第二个附件为 dist*(1-src)混合
+		glBlendEquation(GL_FUNC_ADD);//确保混合模式是加法
+		// bind transparent framebuffer to render transparent objects
+		glBindFramebuffer(GL_FRAMEBUFFER, transparentFBO); //绑定帧缓冲区到半透明区
+		// use a four component float array or a glm::vec4(0.0)
+		glClearBufferfv(GL_COLOR, 0, &zeroFillerVec[0]);//清除第一个附件的颜色为黑（累积）
+		// use a four component float array or a glm::vec4(1.0)
+		glClearBufferfv(GL_COLOR, 1, &oneFillerVec[0]);//清除第二个附件的颜色为白（显现）
+
 		planeShader.use();
 		planeShader.setMat4("projection", projection);
 		planeShader.setMat4("view", view);
@@ -424,19 +479,59 @@ int main()
 		glDrawArraysInstanced(GL_TRIANGLES, 0, 6, amount);
 		glBindVertexArray(0);
 
-		// draw skybox as last
-		glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
-		skyboxShader.use();
-		view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // remove translation from the view matrix
-		skyboxShader.setMat4("view", view);
-		skyboxShader.setMat4("projection", projection);
-		// skybox cube
-		glBindVertexArray(skyboxVAO);
+		// ------------ COMPOSITE ------------
+		// set render states
+		glDepthFunc(GL_ALWAYS);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		// bind opaque framebuffer
+		glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
+		// use composite shader
+		compositeShader.use();
+		// draw screen quad
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		glBindVertexArray(0);
-		glDepthFunc(GL_LESS); // set depth function back to default
+		glBindTexture(GL_TEXTURE_2D, accumTexture);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, revealTexture);
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		// set render states
+		glDisable(GL_DEPTH_TEST);
+		glDepthMask(GL_TRUE); // enable depth writes so glClear won't ignore clearing the depth buffer
+		glDisable(GL_BLEND);
+
+		// bind backbuffer
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+		// use screen shader
+		screenShader.use();
+
+		// draw final screen quad
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, opaqueTexture);
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+
+		//TODO： 现在暂时有天空盒不能使用帧缓冲
+		// draw skybox as last
+		//glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+		//skyboxShader.use();
+		//view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // remove translation from the view matrix
+		//skyboxShader.setMat4("view", view);
+		//skyboxShader.setMat4("projection", projection);
+		//// skybox cube
+		//glBindVertexArray(skyboxVAO);
+		//glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+		//glDrawArrays(GL_TRIANGLES, 0, 36);
+		//glBindVertexArray(0);
+		//glDepthFunc(GL_LESS); // set depth function back to default
 
 
 		
@@ -454,6 +549,12 @@ int main()
 	glDeleteBuffers(1, &skyboxVBO);
 	glDeleteBuffers(1, &buffer);
 	glDeleteBuffers(1, &transparentVAO);
+	glDeleteTextures(1, &opaqueTexture);
+	glDeleteTextures(1, &depthTexture);
+	glDeleteTextures(1, &accumTexture);
+	glDeleteTextures(1, &revealTexture);
+	glDeleteFramebuffers(1, &opaqueFBO);
+	glDeleteFramebuffers(1, &transparentFBO);
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------
 	glfwTerminate();

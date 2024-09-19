@@ -1,18 +1,15 @@
-#version 330 core
-out vec4 FragColor;
+#version 420 core
 
-in vec2 TexCoords;
+// shader inputs
+in vec2 texture_coords;
 
-uniform float _Time;
-uniform sampler2D screenTexture;
+// shader outputs
+layout (location = 0) out vec4 frag;
+
+// screen image
+uniform sampler2D screen;
 
 void main()
-{ 
-    float offset = sin(_Time *4) * 0.02;
-    vec2 uv0 = vec2(TexCoords.x - offset, TexCoords.y);
-    vec2 uv1 = vec2(TexCoords.x + offset, TexCoords.y);
-    FragColor.r = texture(screenTexture, uv0).r;
-    FragColor.g = texture(screenTexture, TexCoords).g;
-    FragColor.b = texture(screenTexture, uv1).b;
-    FragColor = vec4(FragColor.rgb,1);
+{
+	frag = vec4(texture(screen, texture_coords).rgb, 1.0f);
 }
