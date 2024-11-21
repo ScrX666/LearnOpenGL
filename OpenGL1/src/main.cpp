@@ -8,9 +8,9 @@
 #include <glm/gtc/type_ptr.hpp>
 
 
-//#include "imgui.h"
-//#include "imgui_impl_glfw.h"
-//#include "imgui_impl_opengl3.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
 #include "Camera.h"
 #include "myShader.h"
@@ -44,6 +44,12 @@ float lastFrame = 0.0f;
 // meshes
 unsigned int planeVAO;
 
+const char* textureFiles[] = {
+    "textures/wall.jpg",
+    "textures/metal.png",
+    "textures/wood.png"
+};
+bool bRenderCube = true;
 int main()
 {
     // glfw: initialize and configure
@@ -52,7 +58,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
+    
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
@@ -68,12 +74,12 @@ int main()
     }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
+    // glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
     // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSwapInterval(1);
     // glad: load all OpenGL function pointers
     // ---------------------------------------
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -81,7 +87,7 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
-
+    
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
@@ -122,7 +128,7 @@ int main()
 
     // load textures
     // -------------
-    unsigned int woodTexture = loadTexture(("textures/wall.jpg"));
+    unsigned int woodTexture = loadTexture(textureFiles[2]);
 
     // configure depth map FBO
     // -----------------------
@@ -162,6 +168,22 @@ int main()
     // -------------
     glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
 
+    // -----------------IMGUI SetUp--------------------
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    ImGui_ImplOpenGL3_Init("#version 420");
+    // Setup Dear ImGui style
+    // ImGui::StyleColorsDark();
+    ImGui::StyleColorsLight();
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    bool show_demo_window = true;
+    
+    
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -175,7 +197,7 @@ int main()
         // input
         // -----
         processInput(window);
-
+            
         // render
         // ------
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -231,6 +253,27 @@ int main()
         glBindTexture(GL_TEXTURE_2D, depthMap);
         //renderQuad();
 
+
+        // Start the Dear ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+        if (show_demo_window)
+        {
+            ImGui::Begin("Settings");
+            ImGui::Checkbox("Full screen", &show_demo_window);
+            ImGui::Checkbox("Render Cube", &bRenderCube);
+            if (ImGui::Button("Close Me"))
+                show_demo_window = false;
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::End();
+        }
+        // Rendering
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
@@ -241,7 +284,10 @@ int main()
     // ------------------------------------------------------------------------
     glDeleteVertexArrays(1, &planeVAO);
     glDeleteBuffers(1, &planeVBO);
-
+    // Cleanup
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwTerminate();
     return 0;
 }
@@ -250,6 +296,7 @@ int main()
 // --------------------
 void renderScene(const Shader& shader)
 {
+    
     // floor
     glm::mat4 model = glm::mat4(1.0f);
     shader.setMat4("model", model);
@@ -260,17 +307,21 @@ void renderScene(const Shader& shader)
     model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0));
     model = glm::scale(model, glm::vec3(0.5f));
     shader.setMat4("model", model);
+    if(bRenderCube)
     renderCube();
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(2.0f, 0.0f, 1.0));
     model = glm::scale(model, glm::vec3(0.5f));
     shader.setMat4("model", model);
+    if(bRenderCube)
     renderCube();
+
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(-1.0f, 0.0f, 2.0));
     model = glm::rotate(model, glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
     model = glm::scale(model, glm::vec3(0.25));
     shader.setMat4("model", model);
+    if(bRenderCube)
     renderCube();
 }
 
