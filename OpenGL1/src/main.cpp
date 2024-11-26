@@ -11,11 +11,14 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
 
 #include "Camera.h"
 #include "myShader.h"
+
 #include "stb_image.h"
 #include "myModel.h"
+
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -26,7 +29,7 @@ unsigned int loadTexture(const char* path);
 void renderScene(const Shader& shader);
 void renderCube();
 void renderQuad();
-void renderPointLight(Shader& shader);
+void renderPointLight(Shader& shader, Model model, float pos[3]);
 
 // settings
 const unsigned int SCR_WIDTH = 1200;
@@ -45,9 +48,6 @@ float lastFrame = 0.0f;
 // meshes
 unsigned int planeVAO;
 
-//Model pointLightMesh("Assets/Light/pointLight.obj");
-//Model pointLightMesh("Assets/nanosuit/nanosuit.obj");
-//Model rockModel("Assets/rock/rock.obj");
 
 const char* textureFiles[] = {
 	"textures/wall.jpg",
@@ -56,6 +56,7 @@ const char* textureFiles[] = {
 	"textures/brickwall.jpg"
 };
 const char* normalTexture = "textures/brickwall_normal.jpg";
+bool bRotateLight = false;
 bool bRenderCube = true;
 int main()
 {
@@ -81,7 +82,7 @@ int main()
 	}
 	glfwMakeContextCurrent(window);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	// glfwSetCursorPosCallback(window, mouse_callback);
+	//glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 
 	// tell GLFW to capture our mouse
@@ -104,8 +105,9 @@ int main()
 	Shader simpleDepthShader("shader/simpleDepth.vs", "shader/simpleDepth.fs");
 	Shader debugDepthQuad("shader/quad_depth.vs", "shader/quad_depth.fs");
 	Shader shadowMapShader("shader/shadowMap.vs", "shader/shadowMap.fs");
-	Shader objectShader("shader/object.vs", "shader/object.fs");
+	Shader lightShader("shader/light.vs", "shader/light.fs");
 
+	Model model_light("Assets/Light/pointLight.obj");
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
 	float planeVertices[] = {
@@ -184,7 +186,7 @@ int main()
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
 	ImGui_ImplOpenGL3_Init("#version 420");
 	// Setup Dear ImGui style
 	// ImGui::StyleColorsDark();
@@ -199,6 +201,13 @@ int main()
 	// -----------
 	while (!glfwWindowShouldClose(window))
 	{
+		// Start the Dear ImGui frame
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+
+		ImGui::Begin("Settings");
+
 		// per-frame time logic
 		// --------------------
 		float currentFrame = static_cast<float>(glfwGetTime());
@@ -259,22 +268,54 @@ int main()
 
 		// render Depth map to quad for visual debugging
 		// ---------------------------------------------
-		debugDepthQuad.use();
-		debugDepthQuad.setFloat("near_plane", near_plane);
-		debugDepthQuad.setFloat("far_plane", far_plane);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, depthMap);
+		//debugDepthQuad.use();
+		//debugDepthQuad.setFloat("near_plane", near_plane);
+		//debugDepthQuad.setFloat("far_plane", far_plane);
+		//glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_2D, depthMap);
 		//renderQuad();
-		//renderPointLight(objectShader);
+
+		// UI - light pos
+		ImGui::Text("Light Position\n");
+		static float pos[3]{ 8.0f, 8.0f, 0.0f };
+		ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
+		ImGui::SliderFloat("X", pos, -50.0f, 50.0f, "%.3f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::SliderFloat("Y", pos+1, -50.0f, 50.0f, "%.3f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::SliderFloat("Z", pos+2, -50.0f, 50.0f, "%.3f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::Text("Position");
+
+		//float orient[3] = {pos[0],pos[1],pos[2]};
+		//ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
+		//ImGui::DragFloat("Pitch", orient, 0.1f, -180.0f, 180.0f, "%.1f");
+		//ImGui::PopItemWidth();
+		//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		//ImGui::DragFloat("Roll", orient + 1, 0.1f, -180.0f, 180.0f, "%.1f");
+		//ImGui::PopItemWidth();
+		//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		//ImGui::DragFloat("Yaw", orient + 2, 0.1f, -180.0f, 180.0f, "%.1f");
+		//ImGui::PopItemWidth();
+		//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		//ImGui::Text("Orientation");
+		ImGui::Checkbox("Rotate the Light", &bRotateLight);
+		if(bRotateLight)
+		{
+			//rotate the light ‘≤÷‹‘À∂Ø
+			float angle = 2 * 3.14 * glfwGetTime() / 5;
+			pos[2] = 10 * cos(angle);
+			pos[0] = 10 * sin(angle);
+		}
+
+		renderPointLight(lightShader, model_light, pos);
 
 
 
-		// Start the Dear ImGui frame
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
-
-		ImGui::Begin("Settings");
+		
 		ImGui::Checkbox("Show Demo Sample", &show_demo_window);
 		// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
 		if (show_demo_window)
@@ -457,12 +498,18 @@ void renderQuad()
 	glBindVertexArray(0);
 }
 
-void renderPointLight(Shader& shader)
+void renderPointLight(Shader& shader, Model custom_model, float lightpos[3])
 {
+	shader.use();
+	glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+	glm::mat4 view = camera.GetViewMatrix();
+	shader.setMat4("projection", projection);
+	shader.setMat4("view", view);
 	glm::mat4 model = glm::mat4(1);
-	model = glm::translate(model, glm::vec3(0, 3, 3));
+	model = glm::scale(model, glm::vec3(0.2f));
+	model = glm::translate(model, glm::vec3(lightpos[0],lightpos[1],lightpos[2]));
 	shader.setMat4("model", model);
-	//rockModel.Draw(shader);
+	custom_model.Draw(shader);
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
