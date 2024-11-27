@@ -29,7 +29,7 @@ unsigned int loadTexture(const char* path);
 void renderScene(const Shader& shader);
 void renderCube();
 void renderQuad();
-void renderPointLight(Shader& shader, Model model, float pos[3]);
+void renderPointLight(Shader& shader, Model model, glm::vec3 lightpos);
 
 // settings
 const unsigned int SCR_WIDTH = 1200;
@@ -258,6 +258,41 @@ int main()
 		shadowMapShader.setVec3("viewPos", camera.Position);
 		shadowMapShader.setVec3("lightPos", lightPos);
 		shadowMapShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+		// UI - light pos
+		ImGui::Text("Light Position\n");
+		static float p_pos[3]{ 8.0f, 8.0f, 0.0f };
+		ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
+		ImGui::SliderFloat("X", p_pos, -50.0f, 50.0f, "%.3f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::SliderFloat("Y", p_pos + 1, -50.0f, 50.0f, "%.3f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::SliderFloat("Z", p_pos + 2, -50.0f, 50.0f, "%.3f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::Text("Position");
+		// cast to vec3
+		glm::vec3 pointLight_pos = glm::vec3(p_pos[0], p_pos[1], p_pos[2]);
+
+		ImGui::Checkbox("Rotate the Light", &bRotateLight);
+		if (bRotateLight)
+		{
+			//rotate the light 
+			float angle = 2.0f * 3.14f * static_cast<float>(glfwGetTime()) / 5.0f;
+			pointLight_pos.z = 10 * cos(angle);
+			pointLight_pos.x = 10 * sin(angle);
+		}
+		shadowMapShader.setVec3("pointLight[0].position", pointLight_pos);
+		shadowMapShader.setVec3("pointLights[0].ambient", glm::vec3(0.05f, 0.05f, 0.05f));
+		shadowMapShader.setVec3("pointLights[0].diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
+		shadowMapShader.setVec3("pointLights[0].specular", glm::vec3(1.0f, 1.0f, 1.0f));
+		shadowMapShader.setFloat("pointLights[0].constant", 1.0f);
+		shadowMapShader.setFloat("pointLights[0].linear", 0.09f);
+		shadowMapShader.setFloat("pointLights[0].quadratic", 0.032f);
+
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, woodTexture);
 		glActiveTexture(GL_TEXTURE1);
@@ -266,6 +301,7 @@ int main()
 		glBindTexture(GL_TEXTURE_2D, depthMap);
 		renderScene(shadowMapShader);
 
+		
 		// render Depth map to quad for visual debugging
 		// ---------------------------------------------
 		//debugDepthQuad.use();
@@ -275,20 +311,7 @@ int main()
 		//glBindTexture(GL_TEXTURE_2D, depthMap);
 		//renderQuad();
 
-		// UI - light pos
-		ImGui::Text("Light Position\n");
-		static float pos[3]{ 8.0f, 8.0f, 0.0f };
-		ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
-		ImGui::SliderFloat("X", pos, -50.0f, 50.0f, "%.3f");
-		ImGui::PopItemWidth();
-		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-		ImGui::SliderFloat("Y", pos+1, -50.0f, 50.0f, "%.3f");
-		ImGui::PopItemWidth();
-		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-		ImGui::SliderFloat("Z", pos+2, -50.0f, 50.0f, "%.3f");
-		ImGui::PopItemWidth();
-		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-		ImGui::Text("Position");
+
 
 		//float orient[3] = {pos[0],pos[1],pos[2]};
 		//ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
@@ -302,16 +325,9 @@ int main()
 		//ImGui::PopItemWidth();
 		//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 		//ImGui::Text("Orientation");
-		ImGui::Checkbox("Rotate the Light", &bRotateLight);
-		if(bRotateLight)
-		{
-			//rotate the light ‘≤÷‹‘À∂Ø
-			float angle = 2 * 3.14 * glfwGetTime() / 5;
-			pos[2] = 10 * cos(angle);
-			pos[0] = 10 * sin(angle);
-		}
 
-		renderPointLight(lightShader, model_light, pos);
+
+		renderPointLight(lightShader, model_light, pointLight_pos);
 
 
 
@@ -498,7 +514,7 @@ void renderQuad()
 	glBindVertexArray(0);
 }
 
-void renderPointLight(Shader& shader, Model custom_model, float lightpos[3])
+void renderPointLight(Shader& shader, Model custom_model, glm::vec3 lightpos)
 {
 	shader.use();
 	glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -507,7 +523,7 @@ void renderPointLight(Shader& shader, Model custom_model, float lightpos[3])
 	shader.setMat4("view", view);
 	glm::mat4 model = glm::mat4(1);
 	model = glm::scale(model, glm::vec3(0.2f));
-	model = glm::translate(model, glm::vec3(lightpos[0],lightpos[1],lightpos[2]));
+	model = glm::translate(model, lightpos);
 	shader.setMat4("model", model);
 	custom_model.Draw(shader);
 }

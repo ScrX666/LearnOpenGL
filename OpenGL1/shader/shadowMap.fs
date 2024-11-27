@@ -15,11 +15,49 @@ uniform sampler2D shadowMap;
 uniform vec3 lightPos;
 uniform vec3 viewPos;
 
+struct PointLight {
+    vec3 position;
+
+    float constant;
+    float linear;
+    float quadratic;
+
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};  
+
+#define NR_POINT_LIGHTS 1
+uniform PointLight pointLights[NR_POINT_LIGHTS];
+
+
 #define NUM_SAMPLES 100
 #define PI 3.1415
 //采样圈数
 #define NUM_RINGS 10
 vec2 poissonDisk[NUM_SAMPLES];
+
+vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
+{
+    vec3 lightDir = normalize(light.position - fragPos);
+    // 漫反射着色
+    float diff = max(dot(normal, lightDir), 0.0);
+    // 镜面光着色
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
+    // 衰减
+    float distance    = length(light.position - fragPos);
+    float attenuation = 1.0 / (light.constant + light.linear * distance + 
+                 light.quadratic * (distance * distance));    
+    // 合并结果
+    vec3 ambient  = light.ambient  * vec3(texture(diffuseTexture, fs_in.TexCoords));
+    vec3 diffuse  = light.diffuse  * diff * vec3(texture(diffuseTexture, fs_in.TexCoords));
+    vec3 specular = light.specular * spec;
+    ambient  *= attenuation;
+    diffuse  *= attenuation;
+    specular *= attenuation;
+    return (ambient + diffuse + specular);
+}
 
 float rand_2to1(vec2 uv ) {//传入一个二维数，传出一个假随机数。
     // 0 - 1
@@ -131,8 +169,9 @@ float ShadowCalculation(vec4 fragPosLightSpace)
 void main()
 {           
     vec3 color = texture(diffuseTexture, fs_in.TexCoords).rgb;
-    vec3 normal = texture(normalTexture, fs_in.TexCoords).rgb;
-    normal = normalize(normal * 2 -1);
+    //vec3 normal = texture(normalTexture, fs_in.TexCoords).rgb;
+    //normal = normalize(normal);
+    vec3 normal = normalize(fs_in.Normal);
     vec3 lightColor = vec3(0.3);
     // ambient
     vec3 ambient = 0.3 * lightColor;
@@ -150,6 +189,9 @@ void main()
     // calculate shadow
     float shadow = ShadowCalculation(fs_in.FragPosLightSpace);                      
     vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;    
-    
-    FragColor = vec4(lighting, 1.0);
+    // Point Light
+    for(int i = 0; i < NR_POINT_LIGHTS; i++)
+        FragColor.rgb += CalcPointLight(pointLights[i], normal, fs_in.FragPos, viewDir);    
+
+    //FragColor = vec4(lighting, 1.0);
 }
