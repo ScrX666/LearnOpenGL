@@ -107,6 +107,7 @@ int main()
 	Shader shadowMapShader("shader/shadowMap.vs", "shader/shadowMap.fs");
 	Shader lightShader("shader/light.vs", "shader/light.fs");
 	Shader objectShader("shader/object.vs", "shader/object.fs");
+	Shader pointLightShader("shader/pointLightShadow.vs", "shader/pointLightShadow.fs", "shader/pointLightShadow.gs");
 
 	Model model_light("Assets/Light/pointLight.obj");
 	// set up vertex data (and buffer(s)) and configure vertex attributes
