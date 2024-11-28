@@ -25,6 +25,8 @@ struct PointLight {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
+
+    float intensity;
 };  
 
 #define NR_POINT_LIGHTS 1
@@ -51,7 +53,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
                  light.quadratic * (distance * distance));    
     // 合并结果
     vec3 ambient  = light.ambient  * vec3(texture(diffuseTexture, fs_in.TexCoords));
-    vec3 diffuse  = light.diffuse  * diff * vec3(texture(diffuseTexture, fs_in.TexCoords));
+    vec3 diffuse  = light.intensity * light.diffuse  * diff * vec3(texture(diffuseTexture, fs_in.TexCoords));
     vec3 specular = light.specular * spec;
     ambient  *= attenuation;
     diffuse  *= attenuation;
@@ -190,8 +192,9 @@ void main()
     float shadow = ShadowCalculation(fs_in.FragPosLightSpace);                      
     vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;    
     // Point Light
+    vec3 result = vec3(0.0);
     for(int i = 0; i < NR_POINT_LIGHTS; i++)
-        FragColor.rgb += CalcPointLight(pointLights[i], normal, fs_in.FragPos, viewDir);    
+        result = CalcPointLight(pointLights[i], normal, fs_in.FragPos, viewDir);    
 
-    //FragColor = vec4(lighting, 1.0);
+    FragColor = vec4(result + lighting, 1.0);
 }

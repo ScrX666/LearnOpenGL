@@ -106,6 +106,7 @@ int main()
 	Shader debugDepthQuad("shader/quad_depth.vs", "shader/quad_depth.fs");
 	Shader shadowMapShader("shader/shadowMap.vs", "shader/shadowMap.fs");
 	Shader lightShader("shader/light.vs", "shader/light.fs");
+	Shader objectShader("shader/object.vs", "shader/object.fs");
 
 	Model model_light("Assets/Light/pointLight.obj");
 	// set up vertex data (and buffer(s)) and configure vertex attributes
@@ -273,6 +274,8 @@ int main()
 		ImGui::PopItemWidth();
 		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 		ImGui::Text("Position");
+		static float p0_Intensity = 1.0f;
+		ImGui::SliderFloat("PointLight Intensity", &p0_Intensity, 0.0f, 5.0f, "%.2f");
 		// cast to vec3
 		glm::vec3 pointLight_pos = glm::vec3(p_pos[0], p_pos[1], p_pos[2]);
 
@@ -284,9 +287,11 @@ int main()
 			pointLight_pos.z = 10 * cos(angle);
 			pointLight_pos.x = 10 * sin(angle);
 		}
-		shadowMapShader.setVec3("pointLight[0].position", pointLight_pos);
+		
+		shadowMapShader.setVec3("pointLights[0].position", pointLight_pos);
 		shadowMapShader.setVec3("pointLights[0].ambient", glm::vec3(0.05f, 0.05f, 0.05f));
 		shadowMapShader.setVec3("pointLights[0].diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
+		shadowMapShader.setFloat("pointLights[0].intensity", p0_Intensity);
 		shadowMapShader.setVec3("pointLights[0].specular", glm::vec3(1.0f, 1.0f, 1.0f));
 		shadowMapShader.setFloat("pointLights[0].constant", 1.0f);
 		shadowMapShader.setFloat("pointLights[0].linear", 0.09f);
