@@ -1,11 +1,9 @@
-#version 420
-//Shader heavily based on: https://learnopengl.com/code_viewer_gh.php?code=src/5.advanced_lighting/3.2.2.point_shadows_soft/3.2.2.point_shadows_depth.vs
+#version 420 core
+layout (location = 0) in vec3 aPos;
 
-layout (location = 0) in vec3 vPosition;
-
-uniform mat4 modelTransformation;
+uniform mat4 model;
 
 void main()
 {
-    gl_Position = modelTransformation * vec4(vPosition, 1.0);
+    gl_Position = model * vec4(aPos, 1.0);
 }

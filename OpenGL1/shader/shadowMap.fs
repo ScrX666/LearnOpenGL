@@ -11,9 +11,11 @@ in VS_OUT {
 uniform sampler2D diffuseTexture;
 uniform sampler2D normalTexture;
 uniform sampler2D shadowMap;
+uniform samplerCube depthCubeMap;
 
 uniform vec3 lightPos;
 uniform vec3 viewPos;
+uniform float far_plane;
 
 struct PointLight {
     vec3 position;
@@ -31,6 +33,8 @@ struct PointLight {
 
 #define NR_POINT_LIGHTS 1
 uniform PointLight pointLights[NR_POINT_LIGHTS];
+uniform int b_dshadow;
+uniform int b_pshadow;
 
 
 #define NUM_SAMPLES 100
@@ -38,6 +42,15 @@ uniform PointLight pointLights[NR_POINT_LIGHTS];
 //采样圈数
 #define NUM_RINGS 10
 vec2 poissonDisk[NUM_SAMPLES];
+
+vec3 sampleOffsetDirections[20] = vec3[]
+(
+   vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+   vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+   vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+   vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+);   
 
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 {
@@ -59,6 +72,30 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     diffuse  *= attenuation;
     specular *= attenuation;
     return (ambient + diffuse + specular);
+}
+
+float PointShadowCalculation(PointLight light, vec3 fragPos)
+{
+    // Get vector between fragment position and light position
+    vec3 fragToLight = fragPos - light.position;
+    float currentDepth = length(fragToLight);
+    float shadow = 0.0;
+    float bias   = 0.15;
+    int samples  = 20;
+    float viewDistance = length(viewPos - fragPos);
+    float diskRadius = (1.0 + (viewDistance / far_plane)) / 25.0;  
+    for(int i = 0; i < samples; ++i)
+    {
+        float closestDepth = texture(depthCubeMap, fragToLight + sampleOffsetDirections[i] * diskRadius).r;
+        closestDepth *= far_plane;   // undo mapping [0;1]
+        if(currentDepth - bias > closestDepth)
+            shadow += 1.0;
+    }
+    shadow /= float(samples);  
+    if(currentDepth > far_plane)
+        shadow = 0.0;
+        
+    return shadow;
 }
 
 float rand_2to1(vec2 uv ) {//传入一个二维数，传出一个假随机数。
@@ -189,8 +226,10 @@ void main()
     spec = pow(max(dot(normal, halfwayDir), 0.0), 64.0);
     vec3 specular = spec * lightColor;    
     // calculate shadow
-    float shadow = ShadowCalculation(fs_in.FragPosLightSpace);                      
-    vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;    
+    float shadow = b_dshadow * ShadowCalculation(fs_in.FragPosLightSpace); 
+    float pshadow = b_pshadow * PointShadowCalculation(pointLights[0], fs_in.FragPos);
+    vec3 lighting = (ambient + (1.0 - shadow - pshadow) * (diffuse + specular)) * color;  
+       
     // Point Light
     vec3 result = vec3(0.0);
     for(int i = 0; i < NR_POINT_LIGHTS; i++)
