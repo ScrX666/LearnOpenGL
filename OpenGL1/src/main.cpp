@@ -27,6 +27,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 unsigned int loadTexture(const char* path);
 void renderScene(const Shader& shader);
+void renderModel(Shader& shader, Model customModel);
 void renderCube();
 void renderQuad();
 void renderPointLight(Shader& shader, Model model, glm::vec3 lightpos);
@@ -86,7 +87,6 @@ int main()
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	//glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
-
 	// tell GLFW to capture our mouse
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	glfwSwapInterval(1);
@@ -97,6 +97,7 @@ int main()
 		std::cout << "Failed to initialize GLAD" << std::endl;
 		return -1;
 	}
+
 
 	// configure global opengl state
 	// -----------------------------
@@ -112,18 +113,54 @@ int main()
 	Shader pointLightShader("shader/pointLightShadow.vs", "shader/pointLightShadow.fs", "shader/pointLightShadow.gs");
 
 	Model model_light("Assets/Light/pointLight.obj");
+	Model model_cyborg("Assets/cyborg/cyborg.obj");
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
-	float planeVertices[] = {
-		// positions            // normals         // texcoords
-		 25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-		-25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
-		-25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+	glm::vec3 pos1(25.0f, -0.5f, 25.0f);
+	glm::vec3 pos2(-25.0f, -0.5f, 25.0f);
+	glm::vec3 pos3(-25.0f, -0.5f, -25.0f);
+	glm::vec3 pos4(25.0f, -0.5f, -25.0f);
 
-		 25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-		-25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
-		 25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
-	};
+	glm::vec2 uv1(25.0f, 0.0f);
+	glm::vec2 uv2(0.0f, 0.0f);
+	glm::vec2 uv3(0.0f, 25.0f);
+	glm::vec2 uv4(25.0f, 25.0f);
+
+
+	glm::vec3 nm(0.0f, 1.0f, 0.0f);
+
+	// calculate tangent/bitangent vectors of both triangles 1
+	glm::vec3 tangent1;
+	glm::vec3 tangent2;
+	glm::vec3 edge1 = pos2 - pos1;
+	glm::vec3 edge2 = pos3 - pos1;
+	glm::vec2 deltaUV1 = uv2 - uv1;
+	glm::vec2 deltaUV2 = uv3 - uv1;
+	
+	float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+	tangent1 = f * (deltaUV2.y * edge1 - deltaUV1.y * edge2);
+	
+
+	// - triangle 2 re-calculate
+	edge1 = pos3 - pos1;
+	edge2 = pos4 - pos1;
+	deltaUV1 = uv3 - uv1;
+	deltaUV2 = uv4 - uv1;
+
+	f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+	tangent2 = f * (deltaUV2.y * edge1 - deltaUV1.y * edge2);
+	
+
+	GLfloat planeVertices[] = {
+    // Positions            // Normal         // TexCoords  // Tangent                          // Bitangent
+    pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent1.x, tangent1.y, tangent1.z, 
+    pos2.x, pos2.y, pos2.z, nm.x, nm.y, nm.z, uv2.x, uv2.y, tangent1.x, tangent1.y, tangent1.z,
+    pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent1.x, tangent1.y, tangent1.z,
+
+    pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent2.x, tangent2.y, tangent2.z,
+    pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent2.x, tangent2.y, tangent2.z,
+    pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z,
+};
 	// plane VAO
 	unsigned int planeVBO;
 	glGenVertexArrays(1, &planeVAO);
@@ -132,11 +169,13 @@ int main()
 	glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(GLfloat), (GLvoid*)(8 * sizeof(GLfloat)));
 	glBindVertexArray(0);
 
 
@@ -285,7 +324,9 @@ int main()
 		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
+		//render all opaque object in depth-map
 		renderScene(simpleDepthShader);
+		renderModel(simpleDepthShader, model_cyborg);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		// 0. Create depth cubemap transformation matrices
@@ -351,7 +392,15 @@ int main()
 			pointLight_pos.z = 10 * cos(angle);
 			pointLight_pos.x = 10 * sin(angle);
 		}
-		
+		// Add Color Picker
+		static float lightColor[3] = { 1.0f, 1.0f, 1.0f }; // RGB values
+		ImGui::ColorEdit3("PointLight Color", lightColor, ImGuiColorEditFlags_Float);
+
+		// Convert to glm::vec3 when passing to shader
+		glm::vec3 light_color = glm::vec3(lightColor[0], lightColor[1], lightColor[2]);
+		// Pass to shader
+		shadowMapShader.setVec3("pointLights[0].color", light_color);
+
 		shadowMapShader.setVec3("pointLights[0].position", pointLight_pos);
 		shadowMapShader.setVec3("pointLights[0].ambient", glm::vec3(0.05f, 0.05f, 0.05f));
 		shadowMapShader.setVec3("pointLights[0].diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
@@ -371,7 +420,8 @@ int main()
 		glActiveTexture(GL_TEXTURE3);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubeMap);
 		renderScene(shadowMapShader);
-
+		// render the custom model
+		renderModel(shadowMapShader, model_cyborg);
 		
 		// render Depth map to quad for visual debugging
 		// ---------------------------------------------
@@ -473,6 +523,14 @@ void renderScene(const Shader& shader)
 	shader.setMat4("model", model);
 	if (bRenderCube)
 		renderCube();
+}
+
+void renderModel(Shader& shader, Model customModel)
+{
+	glm::mat4 model = glm::mat4(1);
+	model = translate(model, glm::vec3(4, -0.5, 0));
+	shader.setMat4("model", model);
+	customModel.Draw(shader);
 }
 
 

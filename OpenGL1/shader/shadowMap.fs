@@ -1,4 +1,4 @@
-#version 330 core
+#version 420 core
 out vec4 FragColor;
 
 in VS_OUT {
@@ -6,6 +6,7 @@ in VS_OUT {
     vec3 Normal;
     vec2 TexCoords;
     vec4 FragPosLightSpace;
+    mat3 TBN;
 } fs_in;
 
 uniform sampler2D diffuseTexture;
@@ -29,6 +30,7 @@ struct PointLight {
     vec3 specular;
 
     float intensity;
+    vec3 color;
 };  
 
 #define NR_POINT_LIGHTS 1
@@ -71,7 +73,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     ambient  *= attenuation;
     diffuse  *= attenuation;
     specular *= attenuation;
-    return (ambient + diffuse + specular);
+    return (ambient + diffuse + specular) * light.color;
 }
 
 float PointShadowCalculation(PointLight light, vec3 fragPos)
@@ -94,7 +96,7 @@ float PointShadowCalculation(PointLight light, vec3 fragPos)
     shadow /= float(samples);  
     if(currentDepth > far_plane)
         shadow = 0.0;
-        
+
     return shadow;
 }
 
@@ -208,9 +210,10 @@ float ShadowCalculation(vec4 fragPosLightSpace)
 void main()
 {           
     vec3 color = texture(diffuseTexture, fs_in.TexCoords).rgb;
-    //vec3 normal = texture(normalTexture, fs_in.TexCoords).rgb;
-    //normal = normalize(normal);
-    vec3 normal = normalize(fs_in.Normal);
+    vec3 normal = texture(normalTexture, fs_in.TexCoords).rgb;
+    normal = normalize(normal*2.0-1.0);
+    normal = normalize(fs_in.TBN * normal);
+    // vec3 normal = normalize(fs_in.Normal);
     vec3 lightColor = vec3(0.3);
     // ambient
     vec3 ambient = 0.3 * lightColor;
