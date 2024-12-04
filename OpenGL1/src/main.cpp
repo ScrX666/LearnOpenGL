@@ -111,9 +111,11 @@ int main()
 	Shader lightShader("shader/light.vs", "shader/light.fs");
 	Shader objectShader("shader/object.vs", "shader/object.fs");
 	Shader pointLightShader("shader/pointLightShadow.vs", "shader/pointLightShadow.fs", "shader/pointLightShadow.gs");
+	Shader pbrDirectShader("shader/pbrDirect.vs", "shader/pbrDirect.fs");
 
 	Model model_light("Assets/Light/pointLight.obj");
 	Model model_cyborg("Assets/cyborg/cyborg.obj");
+
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
 	glm::vec3 pos1(25.0f, -0.5f, 25.0f);
@@ -264,6 +266,24 @@ int main()
 	bool show_shadowmap = true;
 
 
+	// PBR
+	// lights
+	// ------
+	glm::vec3 lightPositions[] = {
+		glm::vec3(-10.0f,  10.0f, 10.0f),
+		glm::vec3(10.0f,  10.0f, 10.0f),
+		glm::vec3(-10.0f, -10.0f, 10.0f),
+		glm::vec3(10.0f, -10.0f, 10.0f),
+	};
+	glm::vec3 lightColors[] = {
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f)
+	};
+
+
+
 	// render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
@@ -399,8 +419,8 @@ int main()
 		// Convert to glm::vec3 when passing to shader
 		glm::vec3 light_color = glm::vec3(lightColor[0], lightColor[1], lightColor[2]);
 		// Pass to shader
-		shadowMapShader.setVec3("pointLights[0].color", light_color);
 
+		shadowMapShader.setVec3("pointLights[0].color", light_color);
 		shadowMapShader.setVec3("pointLights[0].position", pointLight_pos);
 		shadowMapShader.setVec3("pointLights[0].ambient", glm::vec3(0.05f, 0.05f, 0.05f));
 		shadowMapShader.setVec3("pointLights[0].diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
