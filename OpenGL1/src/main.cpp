@@ -30,7 +30,9 @@ void renderScene(const Shader& shader);
 void renderModel(Shader& shader, Model customModel);
 void renderCube();
 void renderQuad();
+void renderSphere();
 void renderPointLight(Shader& shader, Model model, glm::vec3 lightpos);
+void renderObjectMatrix(Shader& shader);
 
 // settings
 const unsigned int SCR_WIDTH = 1200;
@@ -57,6 +59,9 @@ const char* textureFiles[] = {
 	"textures/brickwall.jpg"
 };
 const char* normalTexture = "textures/brickwall_normal.jpg";
+const char* baseColor_pbr = "textures/pbr_baseColor.png";
+const char* normal_pbr = "textures/pbr_normal.png";
+const char* orm_pbr = "textures/pbr_ORM.png";
 bool bRotateLight = false;
 bool bRenderCube = true;
 bool bdShadow = true;
@@ -186,6 +191,10 @@ int main()
 	unsigned int woodTexture = loadTexture(textureFiles[3]);
 	unsigned int woodNormolTexture = loadTexture(normalTexture);
 
+	unsigned int pbrBaseColorTexture = loadTexture(baseColor_pbr);
+	unsigned int pbrNormalTexture = loadTexture(normal_pbr);
+	unsigned int pbrORM = loadTexture(orm_pbr);
+
 	// configure depth map FBO
 	// -----------------------
 	const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
@@ -243,6 +252,10 @@ int main()
 	debugDepthQuad.use();
 	debugDepthQuad.setInt("depthMap", 0);
 
+	pbrDirectShader.use();
+	pbrDirectShader.setInt("albedoMap", 0);
+	pbrDirectShader.setInt("normalMap", 1);
+	pbrDirectShader.setInt("ormMap", 2);
 
 
 	// lighting info
@@ -270,20 +283,22 @@ int main()
 	// lights
 	// ------
 	glm::vec3 lightPositions[] = {
-		glm::vec3(-10.0f,  10.0f, 10.0f),
-		glm::vec3(10.0f,  10.0f, 10.0f),
-		glm::vec3(-10.0f, -10.0f, 10.0f),
-		glm::vec3(10.0f, -10.0f, 10.0f),
+		glm::vec3(-10.0f,  22.0f, 10.0f),
+		glm::vec3(10.0f,  22.0f, 10.0f),
+		glm::vec3(-10.0f, 2.0f, 10.0f),
+		glm::vec3(10.0f, 2.0f, 10.0f),
 	};
 	glm::vec3 lightColors[] = {
 		glm::vec3(300.0f, 300.0f, 300.0f),
 		glm::vec3(300.0f, 300.0f, 300.0f),
 		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
 		glm::vec3(300.0f, 300.0f, 300.0f)
 	};
-
-
-
+	int nrRows = 7;
+	int nrColumns = 7;
+	float spacing = 2.5;
 	// render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
@@ -466,9 +481,61 @@ int main()
 		//ImGui::PopItemWidth();
 		//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 		//ImGui::Text("Orientation");
+		static float baseColor[3] = { 0.5f, 0.0f, 0.0f }; // RGB values
+		ImGui::ColorEdit3("PBR Base Color", baseColor, ImGuiColorEditFlags_Float);
 
+		// Convert to glm::vec3 when passing to shader
+		glm::vec3 pbr_basecolor = glm::vec3(baseColor[0], baseColor[1], baseColor[2]);
 
 		renderPointLight(lightShader, model_light, pointLight_pos);
+
+		pbrDirectShader.use();
+		pbrDirectShader.setMat4("projection", projection);
+		pbrDirectShader.setMat4("view", view);
+		pbrDirectShader.setVec3("camPos", camera.Position);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, pbrBaseColorTexture);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, pbrNormalTexture);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, pbrORM);
+		// render rows*column number of spheres with varying metallic/roughness values scaled by rows and columns respectively
+		glm::mat4 model = glm::mat4(1.0f);
+		for (int row = 0; row < nrRows; ++row)
+		{
+			pbrDirectShader.setFloat("metallicRange", (float)row / (float)nrRows);
+			for (int col = 0; col < nrColumns; ++col)
+			{
+				// we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
+				// on direct lighting.
+				pbrDirectShader.setFloat("roughnessRange", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
+
+				model = glm::mat4(1.0f);
+				model = glm::translate(model, glm::vec3(
+					(col - (nrColumns / 2)) * spacing,
+					(row - (nrRows / 2)) * spacing,
+					0.0f
+				));
+				model = glm::translate(model, glm::vec3(0, 12, 0));
+				pbrDirectShader.setMat4("model", model);
+				renderSphere();
+			}
+		}
+		
+		for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+		{
+			glm::vec3 newPos = lightPositions[i] + glm::vec3(sin(glfwGetTime() * 5.0) * 5.0, 0.0, 0.0);
+			newPos = lightPositions[i];
+			pbrDirectShader.setVec3("lightPositions[" + std::to_string(i) + "]", newPos);
+			pbrDirectShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
+			model = glm::mat4(1.0f);
+			model = glm::translate(model, newPos);
+			model = glm::scale(model, glm::vec3(0.5f));
+			pbrDirectShader.setMat4("model", model);
+			renderSphere();
+		}
+
 
 		ImGui::Checkbox("Show Demo Sample", &show_demo_window);
 		// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
@@ -510,6 +577,11 @@ int main()
 	ImGui::DestroyContext();
 	glfwTerminate();
 	return 0;
+}
+
+void renderObjectMatrix(Shader& shader)
+{
+	
 }
 
 // renders the 3D scene
@@ -673,6 +745,101 @@ void renderPointLight(Shader& shader, Model custom_model, glm::vec3 lightpos)
 	model = glm::translate(model, lightpos);
 	shader.setMat4("model", model);
 	custom_model.Draw(shader);
+}
+
+unsigned int sphereVAO = 0;
+unsigned int indexCount;
+void renderSphere()
+{
+	if (sphereVAO == 0)
+	{
+		glGenVertexArrays(1, &sphereVAO);
+
+		unsigned int vbo, ebo;
+		glGenBuffers(1, &vbo);
+		glGenBuffers(1, &ebo);
+
+		std::vector<glm::vec3> positions;
+		std::vector<glm::vec2> uv;
+		std::vector<glm::vec3> normals;
+		std::vector<unsigned int> indices;
+
+		const unsigned int X_SEGMENTS = 64;
+		const unsigned int Y_SEGMENTS = 64;
+		const float PI = 3.14159265359f;
+		for (unsigned int x = 0; x <= X_SEGMENTS; ++x)
+		{
+			for (unsigned int y = 0; y <= Y_SEGMENTS; ++y)
+			{
+				float xSegment = (float)x / (float)X_SEGMENTS;
+				float ySegment = (float)y / (float)Y_SEGMENTS;
+				float xPos = std::cos(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
+				float yPos = std::cos(ySegment * PI);
+				float zPos = std::sin(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
+
+				positions.push_back(glm::vec3(xPos, yPos, zPos));
+				uv.push_back(glm::vec2(xSegment, ySegment));
+				normals.push_back(glm::vec3(xPos, yPos, zPos));
+			}
+		}
+
+		bool oddRow = false;
+		for (unsigned int y = 0; y < Y_SEGMENTS; ++y)
+		{
+			if (!oddRow) // even rows: y == 0, y == 2; and so on
+			{
+				for (unsigned int x = 0; x <= X_SEGMENTS; ++x)
+				{
+					indices.push_back(y * (X_SEGMENTS + 1) + x);
+					indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
+				}
+			}
+			else
+			{
+				for (int x = X_SEGMENTS; x >= 0; --x)
+				{
+					indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
+					indices.push_back(y * (X_SEGMENTS + 1) + x);
+				}
+			}
+			oddRow = !oddRow;
+		}
+		indexCount = static_cast<unsigned int>(indices.size());
+
+		std::vector<float> data;
+		for (unsigned int i = 0; i < positions.size(); ++i)
+		{
+			data.push_back(positions[i].x);
+			data.push_back(positions[i].y);
+			data.push_back(positions[i].z);
+			if (normals.size() > 0)
+			{
+				data.push_back(normals[i].x);
+				data.push_back(normals[i].y);
+				data.push_back(normals[i].z);
+			}
+			if (uv.size() > 0)
+			{
+				data.push_back(uv[i].x);
+				data.push_back(uv[i].y);
+			}
+		}
+		glBindVertexArray(sphereVAO);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), &data[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+		unsigned int stride = (3 + 2 + 3) * sizeof(float);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+	}
+
+	glBindVertexArray(sphereVAO);
+	glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly

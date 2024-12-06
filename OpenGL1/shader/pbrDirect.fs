@@ -6,18 +6,36 @@ in vec3 Normal;
 
 uniform vec3 camPos;
 
-uniform vec3  albedo;
-uniform float metallic;
-uniform float roughness;
-uniform float ao;
+uniform sampler2D albedoMap;
+uniform sampler2D normalMap;
+uniform sampler2D ormMap;
+
+uniform float metallicRange;
+uniform float roughnessRange;
+
 
 // lights
 uniform vec3 lightPositions[4];
 uniform vec3 lightColors[4];
 
-uniform vec3 camPos;
-
 const float PI = 3.14159265359;
+
+vec3 getNormalFromMap()
+{
+    vec3 tangentNormal = texture(normalMap, TexCoords).xyz * 2.0 - 1.0;
+
+    vec3 Q1  = dFdx(WorldPos);
+    vec3 Q2  = dFdy(WorldPos);
+    vec2 st1 = dFdx(TexCoords);
+    vec2 st2 = dFdy(TexCoords);
+
+    vec3 N   = normalize(Normal);
+    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
+    vec3 B  = -normalize(cross(N, T));
+    mat3 TBN = mat3(T, B, N);
+
+    return normalize(TBN * tangentNormal);
+}
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
@@ -59,11 +77,18 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
     return ggx1 * ggx2;
 }
 
-int main()
+void main()
 {
-    vec3 N = normalize(Normal);
+    
+    vec3 N = getNormalFromMap();
     vec3 V = normalize(camPos - WorldPos);
-
+    vec3 albedo = texture(albedoMap, TexCoords).rgb;
+    albedo = pow(albedo, vec3(2.2));
+    vec3 orm = texture(ormMap, TexCoords).rgb;
+    float ao = orm.r;
+    float roughness = orm.g * roughnessRange;
+    float metallic = orm.b * metallicRange;
+    
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, albedo, metallic);
 
@@ -99,6 +124,9 @@ int main()
 
     vec3 ambient = vec3(0.03) * albedo * ao;
     vec3 color = ambient + Lo;
+
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0/2.2)); 
 
     FragColor = vec4(color, 1.0);
 
