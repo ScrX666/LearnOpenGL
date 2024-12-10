@@ -52,14 +52,11 @@ unsigned int planeVAO;
 
 
 Texture woodDiffuse("textures/brickwall.jpg");
-//const char* normalTexture = "textures/brickwall_normal.jpg";
-//const char* baseColor_pbr = "textures/pbr_baseColor.png";
-//const char* normal_pbr = "textures/pbr_normal.png";
-//const char* orm_pbr = "textures/pbr_ORM.png";
 Texture normalTexture("textures/brickwall_normal.jpg");
 Texture baseColor_pbr("textures/pbr_baseColor.png");
 Texture normal_pbr("textures/pbr_normal.png");
 Texture orm_pbr("textures/pbr_ORM.png");
+Texture hdr_texture("textures/newport_loft.hdr");
 
 bool bRotateLight = false;
 bool bRenderCube = true;
@@ -89,7 +86,7 @@ int main()
 	}
 	glfwMakeContextCurrent(window);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	//glfwSetCursorPosCallback(window, mouse_callback);
+	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 	// tell GLFW to capture our mouse
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -106,7 +103,7 @@ int main()
 	// configure global opengl state
 	// -----------------------------
 	glEnable(GL_DEPTH_TEST);
-
+	glDepthFunc(GL_LEQUAL); // set depth function to less than AND equal for skybox depth trick.
 	// build and compile shaders
 	// -------------------------
 	Shader simpleDepthShader("shader/simpleDepth.vs", "shader/simpleDepth.fs");
@@ -116,6 +113,8 @@ int main()
 	Shader objectShader("shader/object.vs", "shader/object.fs");
 	Shader pointLightShader("shader/pointLightShadow.vs", "shader/pointLightShadow.fs", "shader/pointLightShadow.gs");
 	Shader pbrDirectShader("shader/pbrDirect.vs", "shader/pbrDirect.fs");
+	Shader equirectangularToCubemapShader("shader/cubemap.vs", "shader/hdrTocubemap.fs");
+	Shader skyboxShader("shader/skybox.vs", "shader/skybox.fs");
 
 	Model model_light("Assets/Light/pointLight.obj");
 	Model model_cyborg("Assets/cyborg/cyborg.obj");
@@ -192,6 +191,7 @@ int main()
 	unsigned int pbrBaseColorTexture = baseColor_pbr.loadTexture();
 	unsigned int pbrNormalTexture = normal_pbr.loadTexture();
 	unsigned int pbrORM = orm_pbr.loadTexture();
+	unsigned int hdrTexture = hdr_texture.loadHDRTexture();
 
 	// configure depth map FBO
 	// -----------------------
@@ -239,7 +239,32 @@ int main()
 		std::cout << "Framebuffer not complete!" << std::endl;
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	//hdri
+	unsigned int captureFBO, captureRBO;
+	glGenFramebuffers(1, &captureFBO);
+	glGenRenderbuffers(1, &captureRBO);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+	unsigned int envCubemap;
+	glGenTextures(1, &envCubemap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		// note that we store each face with 16 bit floating point values
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+			512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	
 	// shader configuration
 	// --------------------
 	shadowMapShader.use();
@@ -254,6 +279,9 @@ int main()
 	pbrDirectShader.setInt("albedoMap", 0);
 	pbrDirectShader.setInt("normalMap", 1);
 	pbrDirectShader.setInt("ormMap", 2);
+
+	skyboxShader.use();
+	skyboxShader.setInt("environmentMap", 0);
 
 
 	// lighting info
@@ -297,6 +325,45 @@ int main()
 	int nrRows = 7;
 	int nrColumns = 7;
 	float spacing = 2.5;
+
+
+	// render hdr image to CubeMap
+	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+	glm::mat4 captureViews[] =
+	{
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+	};
+
+	// convert HDR equirectangular environment map to cubemap equivalent
+	equirectangularToCubemapShader.use();
+	equirectangularToCubemapShader.setInt("equirectangularMap", 0);
+	equirectangularToCubemapShader.setMat4("projection", captureProjection);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, hdrTexture);
+
+	glViewport(0, 0, 512, 512); // don't forget to configure the viewport to the capture dimensions.
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		equirectangularToCubemapShader.setMat4("view", captureViews[i]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+			GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		renderCube(); // renders a 1x1 cube
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// initialize static shader uniforms before rendering
+// --------------------------------------------------
+	glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+	skyboxShader.use();
+	skyboxShader.setMat4("projection", projection);
+
 	// render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
@@ -533,6 +600,13 @@ int main()
 			pbrDirectShader.setMat4("model", model);
 			renderSphere();
 		}
+
+		// render skybox (render as last to prevent overdraw)
+		skyboxShader.use();
+		skyboxShader.setMat4("view", view);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+		renderCube();
 
 
 		ImGui::Checkbox("Show Demo Sample", &show_demo_window);
