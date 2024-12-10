@@ -16,7 +16,7 @@
 #include "Camera.h"
 #include "myShader.h"
 
-#include "stb_image.h"
+#include "myTexture.h"
 #include "myModel.h"
 
 
@@ -25,7 +25,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
-unsigned int loadTexture(const char* path);
 void renderScene(const Shader& shader);
 void renderModel(Shader& shader, Model customModel);
 void renderCube();
@@ -52,16 +51,16 @@ float lastFrame = 0.0f;
 unsigned int planeVAO;
 
 
-const char* textureFiles[] = {
-	"textures/wall.jpg",
-	"textures/metal.png",
-	"textures/wood.png",
-	"textures/brickwall.jpg"
-};
-const char* normalTexture = "textures/brickwall_normal.jpg";
-const char* baseColor_pbr = "textures/pbr_baseColor.png";
-const char* normal_pbr = "textures/pbr_normal.png";
-const char* orm_pbr = "textures/pbr_ORM.png";
+Texture woodDiffuse("textures/brickwall.jpg");
+//const char* normalTexture = "textures/brickwall_normal.jpg";
+//const char* baseColor_pbr = "textures/pbr_baseColor.png";
+//const char* normal_pbr = "textures/pbr_normal.png";
+//const char* orm_pbr = "textures/pbr_ORM.png";
+Texture normalTexture("textures/brickwall_normal.jpg");
+Texture baseColor_pbr("textures/pbr_baseColor.png");
+Texture normal_pbr("textures/pbr_normal.png");
+Texture orm_pbr("textures/pbr_ORM.png");
+
 bool bRotateLight = false;
 bool bRenderCube = true;
 bool bdShadow = true;
@@ -188,12 +187,11 @@ int main()
 
 	// load textures
 	// -------------
-	unsigned int woodTexture = loadTexture(textureFiles[3]);
-	unsigned int woodNormolTexture = loadTexture(normalTexture);
-
-	unsigned int pbrBaseColorTexture = loadTexture(baseColor_pbr);
-	unsigned int pbrNormalTexture = loadTexture(normal_pbr);
-	unsigned int pbrORM = loadTexture(orm_pbr);
+	unsigned int woodTexture = woodDiffuse.loadTexture();
+	unsigned int woodNormolTexture = normalTexture.loadTexture();
+	unsigned int pbrBaseColorTexture = baseColor_pbr.loadTexture();
+	unsigned int pbrNormalTexture = normal_pbr.loadTexture();
+	unsigned int pbrORM = orm_pbr.loadTexture();
 
 	// configure depth map FBO
 	// -----------------------
@@ -902,41 +900,3 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 	camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
-// utility function for loading a 2D texture from file
-// ---------------------------------------------------
-unsigned int loadTexture(char const* path)
-{
-	unsigned int textureID;
-	glGenTextures(1, &textureID);
-
-	int width, height, nrComponents;
-	unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
-	if (data)
-	{
-		GLenum format;
-		if (nrComponents == 1)
-			format = GL_RED;
-		else if (nrComponents == 3)
-			format = GL_RGB;
-		else if (nrComponents == 4)
-			format = GL_RGBA;
-
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT); // for this tutorial: use GL_CLAMP_TO_EDGE to prevent semi-transparent borders. Due to interpolation it takes texels from next repeat 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		stbi_image_free(data);
-	}
-	else
-	{
-		std::cout << "Texture failed to load at path: " << path << std::endl;
-		stbi_image_free(data);
-	}
-
-	return textureID;
-}

@@ -16,7 +16,7 @@ struct Vertex {
 
 };
 
-struct Texture {
+struct myTexture {
     unsigned int id;
     std::string type;
     std::string path;
@@ -27,10 +27,10 @@ public:
     /*  网格数据  */
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
-    std::vector<Texture> textures;
+    std::vector<myTexture> textures;
     
     //构造函数
-    Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures)
+    Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std::vector<myTexture> textures)
     {
         this->vertices = vertices;
         this->indices = indices;
