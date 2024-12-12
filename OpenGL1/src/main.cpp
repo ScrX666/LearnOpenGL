@@ -99,7 +99,7 @@ int main()
 		return -1;
 	}
 
-
+	static float baseColor[3] = { 0.5f, 0.0f, 0.0f }; // RGB values
 	// configure global opengl state
 	// -----------------------------
 	glEnable(GL_DEPTH_TEST);
@@ -115,6 +115,8 @@ int main()
 	Shader pbrDirectShader("shader/pbrDirect.vs", "shader/pbrDirect.fs");
 	Shader equirectangularToCubemapShader("shader/cubemap.vs", "shader/hdrTocubemap.fs");
 	Shader skyboxShader("shader/skybox.vs", "shader/skybox.fs");
+	Shader irradianceShader("shader/cubemap.vs", "shader/irradianceMap.fs");
+	Shader pbrShader("shader/pbrDirect.vs", "shader/pbrShader.fs");
 
 	Model model_light("Assets/Light/pointLight.obj");
 	Model model_cyborg("Assets/cyborg/cyborg.obj");
@@ -166,6 +168,18 @@ int main()
     pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent2.x, tangent2.y, tangent2.z,
     pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z,
 };
+	// render hdr image to CubeMap
+	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+	glm::mat4 captureViews[] =
+	{
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+	};
+
 	// plane VAO
 	unsigned int planeVBO;
 	glGenVertexArrays(1, &planeVAO);
@@ -239,6 +253,74 @@ int main()
 		std::cout << "Framebuffer not complete!" << std::endl;
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+
+	// shader configuration
+	// --------------------
+	shadowMapShader.use();
+	shadowMapShader.setInt("diffuseTexture", 0);
+	shadowMapShader.setInt("normalTexture", 1);
+	shadowMapShader.setInt("shadowMap", 2);
+	shadowMapShader.setInt("depthCubeMap", 3);
+	debugDepthQuad.use();
+	debugDepthQuad.setInt("depthMap", 0);
+
+	pbrDirectShader.use();
+	pbrDirectShader.setInt("albedoMap", 0);
+	pbrDirectShader.setInt("normalMap", 1);
+	pbrDirectShader.setInt("ormMap", 2);
+
+    pbrShader.use();
+    pbrShader.setInt("irradianceMap", 0);
+    pbrShader.setFloat("ao", 1.0f);
+
+	skyboxShader.use();
+	skyboxShader.setInt("environmentMap", 0);
+
+
+	// lighting info
+	// -------------
+	glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
+
+	// -----------------IMGUI SetUp--------------------
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+
+	ImGui_ImplOpenGL3_Init("#version 420");
+	// Setup Dear ImGui style
+	// ImGui::StyleColorsDark();
+	ImGui::StyleColorsLight();
+	// Setup Platform/Renderer backends
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	bool show_demo_window = true;
+	bool show_shadowmap = true;
+	// At global scope
+	static const char* pbrShaderItems[] = { "PBR Direct", "PBR IBL" };
+	static int currentShaderItem = 0;
+
+	// PBR
+	// lights
+	// ------
+	glm::vec3 lightPositions[] = {
+		glm::vec3(-10.0f,  22.0f, 10.0f),
+		glm::vec3(10.0f,  22.0f, 10.0f),
+		glm::vec3(-10.0f, 2.0f, 10.0f),
+		glm::vec3(10.0f, 2.0f, 10.0f),
+	};
+	glm::vec3 lightColors[] = {
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f)
+	};
+	int nrRows = 7;
+	int nrColumns = 7;
+	float spacing = 2.5;
+
 	//hdri
 	unsigned int captureFBO, captureRBO;
 	glGenFramebuffers(1, &captureFBO);
@@ -264,80 +346,6 @@ int main()
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	
-	// shader configuration
-	// --------------------
-	shadowMapShader.use();
-	shadowMapShader.setInt("diffuseTexture", 0);
-	shadowMapShader.setInt("normalTexture", 1);
-	shadowMapShader.setInt("shadowMap", 2);
-	shadowMapShader.setInt("depthCubeMap", 3);
-	debugDepthQuad.use();
-	debugDepthQuad.setInt("depthMap", 0);
-
-	pbrDirectShader.use();
-	pbrDirectShader.setInt("albedoMap", 0);
-	pbrDirectShader.setInt("normalMap", 1);
-	pbrDirectShader.setInt("ormMap", 2);
-
-	skyboxShader.use();
-	skyboxShader.setInt("environmentMap", 0);
-
-
-	// lighting info
-	// -------------
-	glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
-
-	// -----------------IMGUI SetUp--------------------
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-
-	ImGui_ImplOpenGL3_Init("#version 420");
-	// Setup Dear ImGui style
-	// ImGui::StyleColorsDark();
-	ImGui::StyleColorsLight();
-	// Setup Platform/Renderer backends
-	ImGui_ImplGlfw_InitForOpenGL(window, true);
-	bool show_demo_window = true;
-	bool show_shadowmap = true;
-
-
-	// PBR
-	// lights
-	// ------
-	glm::vec3 lightPositions[] = {
-		glm::vec3(-10.0f,  22.0f, 10.0f),
-		glm::vec3(10.0f,  22.0f, 10.0f),
-		glm::vec3(-10.0f, 2.0f, 10.0f),
-		glm::vec3(10.0f, 2.0f, 10.0f),
-	};
-	glm::vec3 lightColors[] = {
-		glm::vec3(300.0f, 300.0f, 300.0f),
-		glm::vec3(300.0f, 300.0f, 300.0f),
-		glm::vec3(300.0f, 300.0f, 300.0f),
-		glm::vec3(300.0f, 300.0f, 300.0f),
-		glm::vec3(300.0f, 300.0f, 300.0f),
-		glm::vec3(300.0f, 300.0f, 300.0f)
-	};
-	int nrRows = 7;
-	int nrColumns = 7;
-	float spacing = 2.5;
-
-
-	// render hdr image to CubeMap
-	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-	glm::mat4 captureViews[] =
-	{
-	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
-	};
 
 	// convert HDR equirectangular environment map to cubemap equivalent
 	equirectangularToCubemapShader.use();
@@ -358,6 +366,54 @@ int main()
 		renderCube(); // renders a 1x1 cube
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+
+	// pbr: create an irradiance cubemap, and re-scale capture FBO to irradiance scale.
+	// --------------------------------------------------------------------------------
+	unsigned int irradianceMap;
+	glGenTextures(1, &irradianceMap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
+
+	// pbr: solve diffuse integral by convolution to create an irradiance (cube)map.
+	// -----------------------------------------------------------------------------
+	irradianceShader.use();
+	irradianceShader.setInt("environmentMap", 0);
+	irradianceShader.setMat4("projection", captureProjection);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+	glViewport(0, 0, 32, 32); // don't forget to configure the viewport to the capture dimensions.
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		irradianceShader.setMat4("view", captureViews[i]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		renderCube();
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+
+
+
+
+
 	// initialize static shader uniforms before rendering
 // --------------------------------------------------
 	glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -546,35 +602,59 @@ int main()
 		//ImGui::PopItemWidth();
 		//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 		//ImGui::Text("Orientation");
-		static float baseColor[3] = { 0.5f, 0.0f, 0.0f }; // RGB values
+		
+		if (ImGui::CollapsingHeader("Shader Settings"))
+		{
+		// Add combo box for shader selection
+		ImGui::Combo("PBR Shader", &currentShaderItem, pbrShaderItems, IM_ARRAYSIZE(pbrShaderItems));
+		
 		ImGui::ColorEdit3("PBR Base Color", baseColor, ImGuiColorEditFlags_Float);
-
+		}
 		// Convert to glm::vec3 when passing to shader
 		glm::vec3 pbr_basecolor = glm::vec3(baseColor[0], baseColor[1], baseColor[2]);
 
 		renderPointLight(lightShader, model_light, pointLight_pos);
 
-		pbrDirectShader.use();
-		pbrDirectShader.setMat4("projection", projection);
-		pbrDirectShader.setMat4("view", view);
-		pbrDirectShader.setVec3("camPos", camera.Position);
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, pbrBaseColorTexture);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, pbrNormalTexture);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, pbrORM);
+		// Use selected shader
+		Shader& activeShader = (currentShaderItem == 0) ? pbrDirectShader : pbrShader;
+		activeShader.use();
+		activeShader.setMat4("projection", projection);
+		activeShader.setMat4("view", view);
+		activeShader.setVec3("camPos", camera.Position);
+		if(currentShaderItem == 1)
+		{
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+		}
+		else
+		{
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, pbrBaseColorTexture);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, pbrNormalTexture);
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, pbrORM);
+		}
+		
 		// render rows*column number of spheres with varying metallic/roughness values scaled by rows and columns respectively
 		glm::mat4 model = glm::mat4(1.0f);
 		for (int row = 0; row < nrRows; ++row)
 		{
-			pbrDirectShader.setFloat("metallicRange", (float)row / (float)nrRows);
+			if (currentShaderItem == 1)
+			{
+				activeShader.setFloat("metallic", (float)row / (float)nrRows);
+				activeShader.setVec3("albedo", pbr_basecolor);
+			}
+			else
+				activeShader.setFloat("metallicRange", (float)row / (float)nrRows);
 			for (int col = 0; col < nrColumns; ++col)
 			{
 				// we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
 				// on direct lighting.
-				pbrDirectShader.setFloat("roughnessRange", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
+				if(currentShaderItem == 1)
+					activeShader.setFloat("roughness", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
+				else
+					activeShader.setFloat("roughnessRange", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
 
 				model = glm::mat4(1.0f);
 				model = glm::translate(model, glm::vec3(
@@ -583,7 +663,7 @@ int main()
 					0.0f
 				));
 				model = glm::translate(model, glm::vec3(0, 12, 0));
-				pbrDirectShader.setMat4("model", model);
+				activeShader.setMat4("model", model);
 				renderSphere();
 			}
 		}
@@ -592,12 +672,12 @@ int main()
 		{
 			glm::vec3 newPos = lightPositions[i] + glm::vec3(sin(glfwGetTime() * 5.0) * 5.0, 0.0, 0.0);
 			newPos = lightPositions[i];
-			pbrDirectShader.setVec3("lightPositions[" + std::to_string(i) + "]", newPos);
-			pbrDirectShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
+			activeShader.setVec3("lightPositions[" + std::to_string(i) + "]", newPos);
+			activeShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
 			model = glm::mat4(1.0f);
 			model = glm::translate(model, newPos);
 			model = glm::scale(model, glm::vec3(0.5f));
-			pbrDirectShader.setMat4("model", model);
+			activeShader.setMat4("model", model);
 			renderSphere();
 		}
 
@@ -641,6 +721,20 @@ int main()
 
 	// optional: de-allocate all resources once they've outlived their purpose:
 	// ------------------------------------------------------------------------
+	// Clean up FBOs
+	glDeleteFramebuffers(1, &depthMapFBO);
+	glDeleteFramebuffers(1, &depthCubeMapFBO);
+	glDeleteFramebuffers(1, &captureFBO);
+
+	// Clean up RBOs
+	glDeleteRenderbuffers(1, &captureRBO);
+
+	// Clean up textures
+	glDeleteTextures(1, &depthMap);
+	glDeleteTextures(1, &depthCubeMap);
+	glDeleteTextures(1, &envCubemap);
+	glDeleteTextures(1, &irradianceMap);
+
 	glDeleteVertexArrays(1, &planeVAO);
 	glDeleteBuffers(1, &planeVBO);
 	// Cleanup
