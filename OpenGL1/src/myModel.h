@@ -46,8 +46,10 @@ private:
     void processNode(aiNode* node, const aiScene* scene);
     Mesh processMesh(aiMesh* mesh, const aiScene* scene);
     std::vector<myTexture> loadMaterialTextures(aiMaterial* mat, aiTextureType type,
-                                              std::string typeName);
-
+                                              std::string typeName, const aiScene* scene);
+    unsigned int GenerateTex(unsigned char* data, int width, int height, int nrComponents);
+    unsigned int TextureFrom_FBX_EmbeddedTexture(const aiTexture* aiTex);
+    unsigned int TextureFromFile(const char* path, const std::string& directory);
 };
 
 inline void Model::loadModel(std::string path)
@@ -143,31 +145,34 @@ inline Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
     {
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         // 1. diffuse map
-        std::vector<myTexture> diffuseMaps = loadMaterialTextures(material,aiTextureType_DIFFUSE, "texture_diffuse");
+        std::vector<myTexture> diffuseMaps = loadMaterialTextures(material,aiTextureType_DIFFUSE, "texture_diffuse", scene);
         textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
         // 2. specular map
-        std::vector<myTexture> specularMaps = loadMaterialTextures(material,aiTextureType_SPECULAR, "texture_specular");
+        std::vector<myTexture> specularMaps = loadMaterialTextures(material,aiTextureType_SPECULAR, "texture_specular", scene);
         textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
         // 3. normal maps
-        std::vector<myTexture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+        std::vector<myTexture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal", scene);
         textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+        // 4. height maps
+        std::vector<myTexture> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height", scene);
+        textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
     }
 
     return Mesh(vertices, indices, textures);
 }
 
-inline std::vector<myTexture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName)
+inline std::vector<myTexture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName, const aiScene* scene)
 {
     std::vector<myTexture> textures;
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++)
     {
-        aiString str;
-        mat->GetTexture(type, i, &str);
+        aiString imagePath;
+        mat->GetTexture(type, i, &imagePath);
         // check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
         bool skip = false;
         for (unsigned int j = 0; j < textures_loaded.size(); j++)
         {
-            if (std::strcmp(textures_loaded[j].path.data(), str.C_Str()) == 0)
+            if (std::strcmp(textures_loaded[j].path.data(), imagePath.C_Str()) == 0)
             {
                 textures.push_back(textures_loaded[j]);
                 skip = true; // a texture with the same filepath has already been loaded, continue to next one. (optimization)
@@ -177,9 +182,25 @@ inline std::vector<myTexture> Model::loadMaterialTextures(aiMaterial* mat, aiTex
         if (!skip)
         {   // if texture hasn't been loaded already, load it
             myTexture texture;
-            texture.id = TextureFromFile(str.C_Str(), this->directory);
+
+
+            //利用此方法判断是否是FBX模型内嵌贴图
+            auto tex = scene->GetEmbeddedTexture(imagePath.C_Str());
+            if (tex != nullptr)
+            {
+                //有内嵌贴图
+                texture.id = TextureFrom_FBX_EmbeddedTexture(tex);
+            }
+            else
+            {
+                //无内嵌贴图，就按外部图片路径加载
+                texture.id = TextureFromFile(imagePath.C_Str(), this->directory);
+            }
+
+
+            texture.id = TextureFromFile(imagePath.C_Str(), this->directory);
             texture.type = typeName;
-            texture.path = str.C_Str();
+            texture.path = imagePath.C_Str();
             textures.push_back(texture);
             textures_loaded.push_back(texture);  // store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
         }
@@ -188,7 +209,7 @@ inline std::vector<myTexture> Model::loadMaterialTextures(aiMaterial* mat, aiTex
 }
 
 
-unsigned int TextureFromFile(const char* path, const std::string& directory, bool gamma)
+inline unsigned int Model::TextureFromFile(const char* path, const std::string& directory)
 {
 	std::string filename = std::string(path);
     filename = directory + '/' + filename;
@@ -198,6 +219,36 @@ unsigned int TextureFromFile(const char* path, const std::string& directory, boo
 
     int width, height, nrComponents;
     unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+    return GenerateTex(data, width, height, nrComponents);
+}
+
+
+
+inline unsigned int Model::TextureFrom_FBX_EmbeddedTexture(const aiTexture* aiTex)
+{
+    int width, height, channels;
+    //unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+    unsigned char* data = nullptr;
+
+    //FBX模型用stbi_load_form_memory加载
+    if (aiTex->mHeight == 0)
+    {
+        data = stbi_load_from_memory(reinterpret_cast<unsigned char*>(aiTex->pcData), aiTex->mWidth, &width, &height, &channels, 0);
+    }
+    else
+    {
+        data = stbi_load_from_memory(reinterpret_cast<unsigned char*>(aiTex->pcData), aiTex->mWidth * aiTex->mHeight, &width, &height, &channels, 0);
+    }
+
+    return GenerateTex(data, width, height, channels);
+
+}
+
+inline unsigned int Model::GenerateTex(unsigned char* data, int width, int height, int nrComponents)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
     if (data)
     {
         GLenum format;
@@ -209,6 +260,9 @@ unsigned int TextureFromFile(const char* path, const std::string& directory, boo
             format = GL_RGBA;
 
         glBindTexture(GL_TEXTURE_2D, textureID);
+
+        //伽马矫正需要设置内部格式（第三个参数）为GL_SRGB或者GL_SRGB_ALPHA，这里未设置，可参考伽马矫正那一章节
+        //https://learnopengl-cn.github.io/05%20Advanced%20Lighting/02%20Gamma%20Correction/
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -221,12 +275,13 @@ unsigned int TextureFromFile(const char* path, const std::string& directory, boo
     }
     else
     {
-        std::cout << "Texture failed to load at path: " << path << std::endl;
+        std::cout << "Texture failed to load at path: " << std::endl;
         stbi_image_free(data);
     }
 
     return textureID;
 }
+
 
 #endif
 

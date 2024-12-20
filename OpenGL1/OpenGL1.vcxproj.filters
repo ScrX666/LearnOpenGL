@@ -24,6 +24,12 @@
     <ClCompile Include="src\stb_image.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\myShader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\myTexture.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="4.2.texture.vs" />
@@ -55,6 +61,19 @@
     <None Include="shader\quad_depth.vs" />
     <None Include="shader\shadowMap.vs" />
     <None Include="shader\shadowMap.fs" />
+    <None Include="shader\pointLightShadow.gs" />
+    <None Include="shader\pointLightShadow.vs" />
+    <None Include="shader\pointLightShadow.fs" />
+    <None Include="shader\pbrDirect.fs" />
+    <None Include="shader\pbrDirect.vs" />
+    <None Include="shader\cubemap.vs" />
+    <None Include="shader\hdrTocubemap.fs" />
+    <None Include="shader\irradianceMap.fs" />
+    <None Include="shader\pbrShader.fs" />
+    <None Include="shader\prefilter.fs" />
+    <None Include="shader\brdf.fs" />
+    <None Include="shader\brdf.vs" />
+    <None Include="shader\pbrShader_texture.fs" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stb_image.h">
@@ -69,9 +88,6 @@
     <ClInclude Include="src\myShader.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\stb_image.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="myMesh.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -79,6 +95,18 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\filesystem.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\myMesh.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\myModel.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stb_image.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\myTexture.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

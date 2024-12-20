@@ -133,20 +133,35 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\myShader.cpp" />
+    <ClCompile Include="src\myTexture.cpp" />
     <ClCompile Include="src\stb_image.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="4.2.texture.fs" />
     <None Include="4.2.texture.vs" />
     <None Include="packages.config" />
+    <None Include="shader\brdf.fs" />
+    <None Include="shader\brdf.vs" />
     <None Include="shader\composite.fs" />
     <None Include="shader\composite.vs" />
+    <None Include="shader\cubemap.vs" />
+    <None Include="shader\hdrTocubemap.fs" />
+    <None Include="shader\irradianceMap.fs" />
     <None Include="shader\light.fs" />
+    <None Include="shader\pbrDirect.fs" />
+    <None Include="shader\pbrDirect.vs" />
+    <None Include="shader\pbrShader.fs" />
+    <None Include="shader\pbrShader_texture.fs" />
+    <None Include="shader\pointLightShadow.fs" />
+    <None Include="shader\pointLightShadow.gs" />
     <None Include="shader\light.vs" />
     <None Include="shader\object.fs" />
     <None Include="shader\object.vs" />
     <None Include="shader\plane.fs" />
     <None Include="shader\plane.vs" />
+    <None Include="shader\pointLightShadow.vs" />
+    <None Include="shader\prefilter.fs" />
     <None Include="shader\quad_depth.fs" />
     <None Include="shader\quad_depth.vs" />
     <None Include="shader\screen.fs" />
@@ -163,9 +178,11 @@
     <ClInclude Include="myModel.h" />
     <ClInclude Include="myShader.h" />
     <ClInclude Include="src\Camera.h" />
-    <ClInclude Include="src\filesystem.h" />
+    <ClInclude Include="src\myMesh.h" />
+    <ClInclude Include="src\myModel.h" />
     <ClInclude Include="src\myShader.h" />
     <ClInclude Include="src\stb_image.h" />
+    <ClInclude Include="src\myTexture.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>

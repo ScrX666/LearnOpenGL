@@ -120,10 +120,11 @@ int main()
 	Shader pbrShader("shader/pbrDirect.vs", "shader/pbrShader.fs");
 	Shader prefilterShader("shader/cubemap.vs", "shader/prefilter.fs");
 	Shader brdfShader("shader/brdf.vs", "shader/brdf.fs");
+	Shader pbr_texShader("shader/pbrDirect.vs", "shader/pbrShader_texture.fs");
 
 	Model model_light("Assets/Light/pointLight.obj");
 	Model model_cyborg("Assets/cyborg/cyborg.obj");
-	//Model model_gun("Assets/Cerberus_by_Andrew_Maximov/Cerberus_LP.FBX");
+	Model model_gun("Assets/Cerberus_by_Andrew_Maximov/Cerberus_LP.FBX");
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
@@ -281,6 +282,11 @@ int main()
 
 	skyboxShader.use();
 	skyboxShader.setInt("environmentMap", 0);
+
+	pbr_texShader.use();
+	pbr_texShader.setInt("irradianceMap", 4);
+	pbr_texShader.setInt("prefilterMap",5);
+	pbr_texShader.setInt("brdfLUTTexture", 6);
 
 
 	// lighting info
@@ -649,7 +655,7 @@ int main()
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubeMap);
 		renderScene(shadowMapShader);
 		// render the custom model
-		renderModel(shadowMapShader, model_cyborg);
+		//renderModel(shadowMapShader, model_cyborg);
 		
 		// render Depth map to quad for visual debugging
 		// ---------------------------------------------
@@ -757,6 +763,32 @@ int main()
 			activeShader.setMat4("model", model);
 			renderSphere();
 		}
+		pbr_texShader.use();
+		for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+		{
+			glm::vec3 newPos = lightPositions[i] + glm::vec3(sin(glfwGetTime() * 5.0) * 5.0, 0.0, 0.0);
+			newPos = lightPositions[i];
+			pbr_texShader.setVec3("lightPositions[" + std::to_string(i) + "]", newPos);
+			pbr_texShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
+		}
+		model = glm::mat4(1.0f);
+		pbr_texShader.setMat4("projection", projection);
+		pbr_texShader.setMat4("view", view);
+		pbr_texShader.setVec3("camPos", camera.Position);
+		// bind pre-computed IBL data
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+		glActiveTexture(GL_TEXTURE5);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+		glActiveTexture(GL_TEXTURE6);
+		glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+
+		model = translate(model, glm::vec3(4, 2, 3));
+		model = glm::scale(model, glm::vec3(0.03f));
+		model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0, 0.0, 1.0));
+		model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0, 1.0, 0.0));
+		pbr_texShader.setMat4("model", model);
+		model_gun.Draw(pbr_texShader);
 
 
 		// render skybox (render as last to prevent overdraw)
